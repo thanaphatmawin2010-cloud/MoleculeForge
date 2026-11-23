@@ -26,7 +26,7 @@ function Value({ q, convert, unit, digits = 4 }: { q: Q; convert?: (v: number) =
   if (q.value === null) return <Badge tone="neutral">{t("elementStatus.unknown")}</Badge>;
   const value = convert ? convert(q.value) : q.value;
   return (
-    <span className="inline-flex items-baseline gap-1.5">
+    <span className="ltr-run inline-flex items-baseline gap-1.5">
       <span className="font-mono tabular">{formatNumber(value, i18n.language, digits)}</span>
       <span className="text-2xs text-ink-3">{unit ?? q.unit}</span>
       {q.status === "predicted" && <Badge tone="warning">{t("elementStatus.predicted")}</Badge>}
@@ -61,7 +61,7 @@ function Configuration({ value, className }: { value: string | null | undefined;
     } else if (part) out.push(<span key={k}>{part}</span>);
   }
   return (
-    <span className={className} aria-label={value}>
+    <span className={cx("ltr-run", className)} aria-label={value}>
       {out}
     </span>
   );
@@ -195,7 +195,7 @@ export function ElementDetail({
               <dl>
                 <Row label={t("element.atomicMass")}>
                   {element.atomicMass.value !== null ? (
-                    <span className="inline-flex items-baseline gap-1.5">
+                    <span className="ltr-run inline-flex items-baseline gap-1.5">
                       <span className="font-mono">{element.atomicMass.isMassNumberOfLongestLived ? `[${element.atomicMass.value}]` : fmt(element.atomicMass.value, 6)}</span>
                       {element.atomicMass.uncertainty !== null && <span className="font-mono text-2xs text-ink-3">± {element.atomicMass.uncertainty}</span>}
                       <span className="text-2xs text-ink-3">u</span>
@@ -212,10 +212,10 @@ export function ElementDetail({
                   <Configuration value={element.electronConfiguration.full} className="font-mono text-2xs" />
                 </Row>
                 <Row label={t("element.shells")}>
-                  <span className="font-mono text-xs">{element.shellElectrons.join(", ")}</span>
+                  <span className="ltr-run font-mono text-xs">{element.shellElectrons.join(", ")}</span>
                 </Row>
                 <Row label={t("element.oxidationStates")}>
-                  <span className="font-mono text-xs">
+                  <span className="ltr-run font-mono text-xs">
                     {element.oxidationStates.common.length ? element.oxidationStates.common.map((o) => (o > 0 ? `+${o}` : `${o}`)).join(", ") : "—"}
                   </span>
                 </Row>

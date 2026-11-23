@@ -244,12 +244,19 @@ export function insertFragment(doc: Doc, fragment: Molecule, layout: Vec2[] | nu
   return withAtoms(doc, atoms, bonds, newLayout);
 }
 
-export function formulaOf(m: Molecule): string {
+/** Hill-order formula of the drawn atoms, plus implicit hydrogens when their counts are known. */
+export function formulaOf(m: Molecule, implicitH?: readonly number[]): string {
   const counts = new Map<string, number>();
   for (const a of m.atoms) counts.set(a.el, (counts.get(a.el) ?? 0) + 1);
+  if (implicitH && implicitH.length === m.atoms.length) {
+    const extra = implicitH.reduce((sum, h) => sum + (h ?? 0), 0);
+    if (extra > 0) counts.set("H", (counts.get("H") ?? 0) + extra);
+  }
+  // Hill system: with carbon, C then H then the rest alphabetically; without carbon, all alphabetical.
+  const hasCarbon = counts.has("C");
   const keys = [...counts.keys()].sort((a, b) => {
-    const rank = (k: string) => (k === "C" ? 0 : k === "H" ? 1 : 2);
-    return rank(a) - rank(b) || a.localeCompare(b);
+    const rank = (k: string) => (!hasCarbon ? 0 : k === "C" ? 0 : k === "H" ? 1 : 2);
+    return rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0);
   });
   return keys.map((k) => `${k}${counts.get(k)! > 1 ? counts.get(k) : ""}`).join("");
 }

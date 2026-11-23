@@ -3,7 +3,7 @@
  * render at interactive frame rates; frames render on demand and continuously only while
  * something animates (halo pulse, vibration). Picking uses instance ids.
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -56,6 +56,7 @@ export function Viewer3D({
   const theme = useApp((s) => s.theme);
   const elements = useApp((s) => s.elements);
   const host = useRef<HTMLDivElement>(null);
+  const [webglMissing, setWebglMissing] = useState(false);
   const three = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
@@ -86,6 +87,7 @@ export function Viewer3D({
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
     } catch {
       container.dataset.webgl = "unavailable";
+      setWebglMissing(true);
       return;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -422,6 +424,12 @@ export function Viewer3D({
       data-atoms={molecule.atoms.length}
       role="img"
       aria-label={t("canvas.viewerLabel", { count: molecule.atoms.length, formula: molecule.formula || formulaOf(molecule) })}
-    />
+    >
+      {webglMissing && (
+        <p className="absolute inset-0 grid place-items-center p-6 text-center text-xs leading-5 text-ink-3" data-testid="webgl-missing">
+          {t("canvas.webglMissing")}
+        </p>
+      )}
+    </div>
   );
 }

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "MoleculeForge",
+  "version": "1.0.0",
+  "identifier": "org.moleculeforge.desktop",
+  "build": {
+    "frontendDist": "../../ui/dist",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeDevCommand": { "script": "pnpm dev", "cwd": "../../ui", "wait": false },
+    "beforeBuildCommand": { "script": "pnpm build", "cwd": "../../ui" }
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "MoleculeForge",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "center": true,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data:",
+        "connect-src": "ipc: http://ipc.localhost",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "frame-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      },
+      "freezePrototype": false,
+      "capabilities": ["main"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "MoleculeForge",
+    "category": "Education",
+    "copyright": "MoleculeForge contributors. Third-party licences are listed in LICENSES/.",
+    "license": "MIT",
+    "shortDescription": "Build, validate and simulate molecules offline",
+    "longDescription": "MoleculeForge is an offline molecular workbench: a synced 2D/3D editor with live bond validation and one-click geometry repair, a sourced periodic table, a prebuilt molecule library, force-field, tight-binding, semi-empirical and DFT property calculations, molecular dynamics, docking, and a local AI assistant that answers with values computed by the app's own tools.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "resources": { "resources/": "./" },
+    "linux": {
+      "deb": { "section": "science" },
+      "appimage": { "bundleMediaFramework": false }
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "offlineInstaller", "silent": true },
+      "nsis": { "installMode": "currentUser" }
+    },
+    "macOS": { "minimumSystemVersion": "11.0" }
+  }
+}

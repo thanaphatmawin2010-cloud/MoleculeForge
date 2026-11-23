@@ -177,7 +177,7 @@ def from_rdkit(
             )
         )
     bonds = [
-        Bond(a=b.GetBeginAtomIdx(), b=b.GetEndAtomIdx(), order=_bond_order(b), stereo=_bond_stereo(b))  # type: ignore[arg-type]
+        Bond(a=b.GetBeginAtomIdx(), b=b.GetEndAtomIdx(), order=_bond_order(b), stereo=_bond_stereo(b))
         for b in mol.GetBonds()
     ]
     molecule = Molecule(
@@ -186,7 +186,7 @@ def from_rdkit(
         atoms=atoms,
         bonds=bonds,
         props=dict(props or {}),
-        meta=MoleculeMeta(source=source, category=category),  # type: ignore[arg-type]
+        meta=MoleculeMeta(source=source, category=category),
     )
     return annotate(molecule, mol)
 

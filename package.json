@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "MoleculeForge: offline molecular design, validation and simulation suite",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "packageManager": "pnpm@10.28.0",
   "scripts": {
     "dev": "pnpm --dir ui dev",

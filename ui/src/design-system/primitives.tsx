@@ -173,7 +173,7 @@ export function Kbd({ children, tone = "default" }: { children: ReactNode; tone?
   return (
     <kbd
       className={cx(
-        "inline-flex h-5 min-w-5 items-center justify-center rounded-sm px-1 font-mono text-2xs",
+        "ltr-run inline-flex h-5 min-w-5 items-center justify-center rounded-sm px-1 font-mono text-2xs",
         tone === "inverse" ? "bg-bg/15 text-bg" : "bg-surface-2 text-ink-2 hairline",
       )}
     >

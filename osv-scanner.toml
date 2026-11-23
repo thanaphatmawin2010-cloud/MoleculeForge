@@ -1,0 +1,24 @@
+# OSV-Scanner policy for MoleculeForge. CI runs:
+#   osv-scanner scan source --config osv-scanner.toml --lockfile compute/uv.lock \
+#     --lockfile pnpm-lock.yaml --lockfile app-shell/src-tauri/Cargo.lock
+# and fails on any advisory not listed here. Each exception is reviewed at every release; it
+# names why the advisory does not apply and when it goes away.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0429"
+ignoreUntil = 2027-06-30
+reason = """glib 0.18 (gtk-rs, GTK3) is required by Tauri 2's Linux web view (wry/webkit2gtk); no Tauri 2 release
+uses glib >= 0.20. The advisory concerns glib::VariantStrIter, which neither MoleculeForge nor Tauri calls.
+Resolved when Tauri moves its Linux backend to gtk-rs >= 0.20."""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"
+ignoreUntil = 2027-06-30
+reason = """'chrono is unmaintained' (informational, no vulnerability). Pulled in transitively by Tauri's
+dependencies; MoleculeForge's own code does not use chrono. No fixed version exists."""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+ignoreUntil = 2027-06-30
+reason = """'proc-macro-error is unmaintained' (informational). A compile-time procedural macro used by the
+GTK3 bindings; it is not part of the shipped binary's runtime and no fixed version exists."""

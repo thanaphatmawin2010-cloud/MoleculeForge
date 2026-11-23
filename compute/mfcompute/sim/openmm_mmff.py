@@ -9,6 +9,7 @@ tests/unit/compute/test_openmm_mmff.py). Functional forms: Halgren, J. Comput. C
 from __future__ import annotations
 
 import itertools
+from typing import Any
 
 import openmm
 from openmm import unit
@@ -186,7 +187,8 @@ def build_system(mol: Chem.Mol, variant: str = "MMFF94") -> tuple[openmm.System,
 
 def positions_nm(mol: Chem.Mol) -> list[openmm.Vec3]:
     pos = mol.GetConformer().GetPositions()
-    return [openmm.Vec3(float(x) / 10.0, float(y) / 10.0, float(z) / 10.0) for x, y, z in pos] * unit.nanometer
+    positions: list[Any] = [openmm.Vec3(float(x) / 10.0, float(y) / 10.0, float(z) / 10.0) for x, y, z in pos] * unit.nanometer
+    return positions
 
 
 def best_platform(preferred: str | None = None) -> openmm.Platform:

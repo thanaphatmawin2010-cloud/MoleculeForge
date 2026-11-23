@@ -78,7 +78,8 @@
     },
     "toolbar": "Drawing tools",
     "viewerEmpty": "The 3D structure appears here as you draw.",
-    "viewerLabel": "3D view of {formula}, {count, plural, one {# atom} other {# atoms}}"
+    "viewerLabel": "3D view of {formula}, {count, plural, one {# atom} other {# atoms}}",
+    "webglMissing": "3D view unavailable: this computer's graphics driver does not provide WebGL. Drawing, validation and calculations still work."
   },
   "element": {
     "abundance": "Abundance",
@@ -141,6 +142,10 @@
   "elementStatus": {
     "predicted": "Predicted",
     "unknown": "Unknown"
+  },
+  "error": {
+    "title": "This part of the app hit an error",
+    "retry": "Try again"
   },
   "history": {
     "addAtom": "Add atom",

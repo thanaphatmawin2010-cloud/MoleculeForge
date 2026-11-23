@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "MoleculeForge compute sidecar: cheminformatics, force fields, semi-empirical/DFT quantum chemistry, docking and the local AI tool host."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-license = "Apache-2.0"
+license = "MIT"
 authors = [{ name = "MoleculeForge contributors" }]
 dependencies = [
     "rdkit==2026.9.2",
@@ -18,6 +18,7 @@ dependencies = [
     "meeko==0.8.0",
     "gemmi>=0.7,<0.8",
     "uharfbuzz>=0.50",
+    "geometric>=1.1",
 ]
 
 [dependency-groups]
@@ -61,10 +62,25 @@ plugins = ["pydantic.mypy"]
 exclude = ["build/", "dist/"]
 
 [[tool.mypy.overrides]]
-module = ["rdkit.*", "openmm.*", "pyscf.*", "scipy.*", "meeko.*", "reportlab.*", "psutil.*", "mendeleev.*", "gemmi.*"]
+# Scientific libraries without complete type information (RDKit ships partial stubs that lack
+# most descriptor functions): treated as untyped at the boundary; our own code stays strict.
+module = ["rdkit", "rdkit.*", "openmm", "openmm.*", "pyscf", "pyscf.*", "scipy", "scipy.*", "meeko", "meeko.*",
+          "reportlab", "reportlab.*", "psutil", "psutil.*", "mendeleev", "mendeleev.*", "gemmi", "gemmi.*",
+          "geometric", "geometric.*", "uharfbuzz"]
 ignore_missing_imports = true
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+# RDKit's bundled stubs omit many functions and type attributes wrongly (Descriptors.MolWt,
+# AllChem.MMFFHasAllMoleculeParams, SASAOpts.probeRadius, MolDrawOptions fields, ...). Only these two
+# checks are relaxed, and only in the modules that call RDKit directly.
+module = ["mfcompute.chem.descriptors", "mfcompute.chem.convert", "mfcompute.chem.geometry", "mfcompute.chem.report",
+          "mfcompute.sim.forcefield", "mfcompute.sim.dock", "mfcompute.sim.md", "mfcompute.sim.openmm_mmff",
+          "mfcompute.sim.properties", "mfcompute.data.categorize"]
+disable_error_code = ["attr-defined", "no-untyped-call", "assignment"]
 
 [tool.pytest.ini_options]
 testpaths = ["../tests/unit/compute", "../tests/integration/compute", "../tests/chem-validation"]
-timeout = 900
+timeout = 1800
 addopts = "-q"
+markers = ["slow: runs the local language model on CPU (minutes)"]

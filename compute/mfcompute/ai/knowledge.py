@@ -28,9 +28,10 @@ def _tokens(text: str) -> list[str]:
 
 @lru_cache(maxsize=1)
 def passages() -> list[Passage]:
-    out = []
+    out: list[Passage] = []
     for path in sorted((paths.data_dir() / "knowledge").glob("*.md")):
-        title, source, body = "", "", []
+        title, source = "", ""
+        body: list[str] = []
         for line in [*path.read_text(encoding="utf-8").splitlines(), "# end"]:
             if line.startswith("# "):
                 if title and body:
@@ -58,7 +59,7 @@ def search(query: str, k: int = 3, k1: float = 1.4, b: float = 0.75) -> list[Pas
     docs, df, avg = _index()
     terms = _tokens(query)
     n = len(docs)
-    scored = []
+    scored: list[tuple[float, Passage]] = []
     for passage, doc in zip(passages(), docs, strict=True):
         score = 0.0
         for term in terms:

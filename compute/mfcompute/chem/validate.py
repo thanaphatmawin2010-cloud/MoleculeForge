@@ -26,7 +26,7 @@ import numpy as np
 from rdkit import Chem
 
 from ..data import elements
-from ..models import Atom, Bond, Issue, Molecule
+from ..models import Atom, Bond, BondOrder, Issue, Molecule
 from ..rpc import CHEMISTRY_ERROR, RpcError
 from . import convert
 from .issues import describe_fix, display_params, make_issue
@@ -39,7 +39,7 @@ BOND_TOLERANCE = 0.30  # fractional deviation from the covalent-radius estimate 
 
 ONIUM_PLUS = {"N", "P", "As", "Sb", "O", "S", "Se", "Te"}
 ATE_MINUS = {"B", "Al", "Ga"}
-STEP_DOWN = {"triple": "double", "double": "single", "aromatic": "single"}
+STEP_DOWN: dict[BondOrder, BondOrder] = {"triple": "double", "double": "single", "aromatic": "single"}
 
 FIXABLE = {"SELF_BOND", "DUPLICATE_BOND", "ISOTOPE_UNKNOWN", "VALENCE_EXCEEDED", "AROMATIC_INVALID", "UNDERSATURATED"}
 
@@ -317,6 +317,11 @@ def _record(state: FixState, reason: Issue | str, op: dict[str, Any], before: di
                       "fix": {**op, "description": describe_fix(op["op"], **describe), "params": display_params(describe)}})
 
 
+def _order_change(old: BondOrder, new: BondOrder) -> dict[str, Any]:
+    """Description parameters of a bond-order fix ("from" is a keyword, so they travel as a dict)."""
+    return {"from": old, "to": new}
+
+
 def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
     m = state.molecule
     idx = issue.atoms[0]
@@ -365,7 +370,7 @@ def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
             if not _atom_errors(candidate, idx):
                 state.molecule = candidate
                 _record(state, issue, {"op": "setBondOrder", "bond": bond_idx, "order": order}, _snapshot_bond(m, bond_idx),
-                        candidate, ("bond", bond_idx), a=bond.a, b=bond.b, **{"from": bond.order, "to": order})
+                        candidate, ("bond", bond_idx), a=bond.a, b=bond.b, **_order_change(bond.order, order))
                 return True
 
     # 4. Standard onium / -ate charge (e.g. NR4+, BF4-) when exactly one bond too many.
@@ -390,7 +395,7 @@ def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
         if _error_count(candidate) < _error_count(m):
             state.molecule = candidate
             _record(state, issue, {"op": "setBondOrder", "bond": bond_idx, "order": order}, _snapshot_bond(m, bond_idx),
-                    candidate, ("bond", bond_idx), a=bond.a, b=bond.b, **{"from": bond.order, "to": order})
+                    candidate, ("bond", bond_idx), a=bond.a, b=bond.b, **_order_change(bond.order, order))
             return True
 
     # 6. Remove the newest offending bond (focus first, otherwise the longest bond).
@@ -415,7 +420,7 @@ def _bond_length(m: Molecule, idx: int) -> float:
 def _kekule_assignment(m: Molecule, bond_ids: list[int]) -> dict[int, str] | None:
     """Find single/double orders for the given aromatic bonds giving every atom at most one double bond,
     maximising the number of double bonds (exact search for small systems)."""
-    atoms_needing = {}
+    atoms_needing: dict[int, Any] = {}
     for i in bond_ids:
         b = m.bonds[i]
         atoms_needing[b.a] = atoms_needing.get(b.a, 0)
@@ -528,12 +533,12 @@ def _snap_focus_geometry(state: FixState, focus_bonds: set[int]) -> None:
         if idx >= len(m.bonds):
             continue
         bond = m.bonds[idx]
-        a, b = m.atoms[bond.a], m.atoms[bond.b]
-        expected = elements.expected_bond_length(a.el, b.el, bond.order)
+        end_a, end_b = m.atoms[bond.a], m.atoms[bond.b]
+        expected = elements.expected_bond_length(end_a.el, end_b.el, bond.order)
         length = _bond_length(m, idx)
         if abs(length - expected) / expected <= BOND_TOLERANCE:
             continue
-        move, anchor = (b, a) if degree[bond.b] == 1 else ((a, b) if degree[bond.a] == 1 else (None, None))
+        move, anchor = (end_b, end_a) if degree[bond.b] == 1 else ((end_a, end_b) if degree[bond.a] == 1 else (None, None))
         if move is None or anchor is None:
             continue
         vec = np.array([move.x - anchor.x, move.y - anchor.y, move.z - anchor.z])
@@ -633,7 +638,7 @@ def sanitize(molecule: Molecule) -> dict[str, Any]:
         perceived_bonds = []
         for bond, rd_bond in zip(molecule.bonds, rd.GetBonds(), strict=True):
             order = "aromatic" if rd_bond.GetIsAromatic() else bond.order if bond.order != "aromatic" else "single"
-            perceived_bonds.append(Bond(a=bond.a, b=bond.b, order=order, stereo=bond.stereo))  # type: ignore[arg-type]
+            perceived_bonds.append(Bond(a=bond.a, b=bond.b, order=order, stereo=bond.stereo))
         sanitized = convert.annotate(molecule.model_copy(update={"bonds": perceived_bonds}), rd)
     implicit = []
     if rd is not None:

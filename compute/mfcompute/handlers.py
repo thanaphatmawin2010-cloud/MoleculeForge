@@ -74,7 +74,8 @@ def job_cancel(params: JobRef, ctx: JobContext) -> dict[str, Any]:
 @method("ai.cancel", JobRef, kind="control")
 def ai_cancel(params: JobRef, ctx: JobContext) -> dict[str, Any]:
     """Cancel a running assistant turn."""
-    return job_cancel(params, ctx)
+    result: dict[str, Any] = job_cancel(params, ctx)
+    return result
 
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ import {
   type Wedge,
 } from "./schema";
 
-const Loose = z.record(z.unknown());
+const Loose = z.record(z.string(), z.unknown());
 
 export const ElementQuantity = z.object({
   value: z.number().nullable(),
@@ -94,7 +94,7 @@ export const ElementSchema = z
     cpkColorHex: z.string(),
     commonUses: z.array(z.string()),
     dipolePolarizability: ElementQuantity,
-    notes: z.record(z.string()),
+    notes: z.record(z.string(), z.string()),
   })
   .passthrough();
 
@@ -102,8 +102,8 @@ export type Element = z.infer<typeof ElementSchema>;
 
 const ElementsAllSchema = z.object({
   elements: z.array(ElementSchema),
-  statusLegend: z.record(z.string()),
-  sources: z.record(z.string()),
+  statusLegend: z.record(z.string(), z.string()),
+  sources: z.record(z.string(), z.string()),
 });
 
 export const CapabilitiesSchema = z
@@ -114,7 +114,7 @@ export const CapabilitiesSchema = z
       model: z.string(),
       physicalCores: z.number().nullable(),
       logicalCores: z.number().nullable(),
-      features: z.record(z.boolean()),
+      features: z.record(z.string(), z.boolean()),
       recommendedThreads: z.number(),
     }),
     memory: z.object({ totalBytes: z.number(), availableBytes: z.number() }),
@@ -125,7 +125,7 @@ export const CapabilitiesSchema = z
       accelerated: z.boolean(),
     }),
     engines: z.object({
-      libraries: z.record(z.string()),
+      libraries: z.record(z.string(), z.string()),
       xtb: Loose,
       mopac: Loose,
       vina: Loose,
@@ -148,7 +148,7 @@ export const LibraryItemSchema = z.object({
   favorite: z.boolean(),
   tags: z.array(z.string()),
   created: z.string(),
-  descriptors: z.record(z.unknown()).nullable(),
+  descriptors: z.record(z.string(), z.unknown()).nullable(),
 });
 export type LibraryItem = z.infer<typeof LibraryItemSchema>;
 
@@ -170,7 +170,7 @@ export const api = {
       options,
     ),
   descriptors: (molecule: Molecule) =>
-    rpc().call("chem.descriptors", { molecule }, z.object({ properties: z.record(PropertyValueSchema) })),
+    rpc().call("chem.descriptors", { molecule }, z.object({ properties: z.record(z.string(), PropertyValueSchema) })),
   layout2d: (molecule: Molecule) => rpc().call("chem.layout2d", { molecule }, z.object({ layout2d: Layout2D })),
   convert: (params: Record<string, unknown>) =>
     rpc().call(
@@ -253,7 +253,7 @@ export const AiAnswerSchema = z.object({
     z.object({
       id: z.string(),
       name: z.string(),
-      arguments: z.record(z.unknown()),
+      arguments: z.record(z.string(), z.unknown()),
       ok: z.boolean(),
       durationMs: z.number(),
       summary: z.string(),

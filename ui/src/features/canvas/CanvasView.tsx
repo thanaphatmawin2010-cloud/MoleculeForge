@@ -24,7 +24,7 @@ import { Formula } from "@/design-system/formula";
 import { Badge, Button, IconButton, Kbd, Segmented, Switch, Tooltip, cx } from "@/design-system/primitives";
 import { Quantity } from "@/design-system/quantity";
 import { api } from "@/ipc/api";
-import type { BondOrderT, PropertyValue } from "@/ipc/schema";
+import type { BondOrderT, Molecule, PropertyValue } from "@/ipc/schema";
 import { ELEMENT_KEYS, QUICK_ELEMENTS, elementInk } from "@/lib/chemistry";
 import { angle, dihedral, distance, formulaOf, insertFragment, removeAtoms, removeBonds, updateAtom } from "@/lib/molecule";
 import { useApp } from "@/state/app";
@@ -81,7 +81,8 @@ export function CanvasView() {
   const [layout, setLayout] = useState<Layout>("split");
   const [renderStyle, setRenderStyle] = useState<RenderStyle>("ball-and-stick");
   const [repairOpen, setRepairOpen] = useState(false);
-  const [quick, setQuick] = useState<Record<string, PropertyValue> | null>(null);
+  // Descriptors are tagged with the exact structure they describe and never shown for another one.
+  const [quickFor, setQuickFor] = useState<{ molecule: Molecule; props: Record<string, PropertyValue> } | null>(null);
   const m = doc.molecule;
 
   const errorAtoms = useMemo(() => issueAtoms(issues, "error"), [issues]);
@@ -90,11 +91,19 @@ export function CanvasView() {
   // Quick descriptors for the inspector (debounced, cheap).
   useEffect(() => {
     if (m.atoms.length === 0 || status === "invalid" || status === "checking") return;
+    let live = true;
     const timer = window.setTimeout(() => {
-      api.descriptors(m).then((r) => setQuick(r.properties)).catch(() => setQuick(null));
+      api
+        .descriptors(m)
+        .then((r) => live && setQuickFor({ molecule: m, props: r.properties }))
+        .catch(() => live && setQuickFor(null));
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
   }, [m, status]);
+  const quick = quickFor && quickFor.molecule === m ? quickFor.props : null;
 
   const deleteSelection = useCallback(() => {
     const sel = useEditor.getState().selection;
@@ -375,7 +384,7 @@ export function CanvasView() {
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div>
                 <p className="text-2xs text-ink-3">{t("inspector.formula")}</p>
-                <p className="text-sm text-ink" data-testid="formula"><Formula value={(quick?.formula?.value as string) ?? formulaOf(m)} /></p>
+                <p className="text-sm text-ink" data-testid="formula"><Formula value={(quick?.formula?.value as string) ?? formulaOf(m, implicitH)} /></p>
               </div>
               <div>
                 <p className="text-2xs text-ink-3">{t("inspector.mw")}</p>

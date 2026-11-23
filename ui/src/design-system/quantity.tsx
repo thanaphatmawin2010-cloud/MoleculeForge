@@ -27,7 +27,7 @@ export function Quantity({
   else if (value === null || value === undefined) text = t("value.notAvailable");
   else text = String(value);
   const body = (
-    <span className={cx("inline-flex items-baseline gap-1 tabular", className)}>
+    <span className={cx("ltr-run inline-flex items-baseline gap-1 tabular", className)}>
       <span className={cx("font-mono", emphasis ? "text-lg font-medium text-ink" : "text-sm text-ink")}>{text}</span>
       {uncertainty != null && typeof value === "number" && (
         <span className="font-mono text-2xs text-ink-3">± {formatNumber(uncertainty, i18n.language, 2)}</span>

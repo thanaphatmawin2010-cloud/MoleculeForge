@@ -3,7 +3,7 @@
  * word order). All user-facing strings live in src/locales/<lng>/*.json.
  */
 import i18next from "i18next";
-import ICU from "i18next-icu";
+import ICUModule from "i18next-icu";
 import { initReactI18next } from "react-i18next";
 import enCommon from "@/locales/en/common.json";
 import enElements from "@/locales/en/elements.json";
@@ -12,6 +12,10 @@ import thCommon from "@/locales/th/common.json";
 import thElements from "@/locales/th/elements.json";
 import thIssues from "@/locales/th/issues.json";
 import { readPreference, writePreference } from "./preferences";
+
+// Under some module loaders (Vitest's CommonJS interop) the default import arrives wrapped;
+// i18next would then silently ignore the plugin and return raw ICU text.
+const ICU = ((ICUModule as unknown as { default?: typeof ICUModule }).default ?? ICUModule) as typeof ICUModule;
 
 export const LOCALES = [
   { code: "en", label: "English", dir: "ltr" },

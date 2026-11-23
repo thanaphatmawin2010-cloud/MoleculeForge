@@ -15,6 +15,8 @@ import { LibraryView } from "../features/library/LibraryView";
 import { PeriodicTableView } from "../features/periodic/PeriodicTableView";
 import { SimulateView } from "../features/simulate/SimulateView";
 import { CommandPalette } from "./CommandPalette";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { openMoleculeFile } from "../features/canvas/io";
 import { Logo } from "./Logo";
 import { Onboarding } from "./Onboarding";
 
@@ -61,6 +63,9 @@ export function App() {
       } else if (mod && e.key.toLowerCase() === "j") {
         e.preventDefault();
         useApp.getState().toggleAssistant();
+      } else if (mod && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        void openMoleculeFile();
       } else if (mod && ["1", "2", "3", "4"].includes(e.key)) {
         e.preventDefault();
         setView(NAV[Number(e.key) - 1]!.id);
@@ -157,10 +162,12 @@ export function App() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
             >
-              {view === "build" && <CanvasView />}
-              {view === "elements" && <PeriodicTableView />}
-              {view === "library" && <LibraryView />}
-              {view === "simulate" && <SimulateView />}
+              <ErrorBoundary key={view} area={view}>
+                {view === "build" && <CanvasView />}
+                {view === "elements" && <PeriodicTableView />}
+                {view === "library" && <LibraryView />}
+                {view === "simulate" && <SimulateView />}
+              </ErrorBoundary>
             </motion.div>
           </main>
         </div>

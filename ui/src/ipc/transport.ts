@@ -77,10 +77,14 @@ class BridgeTransport implements Transport {
   }
 }
 
+/** The WebSocket bridge exists only in development and explicit test builds. */
+const BRIDGE_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_BRIDGE === "1";
+
 export function createTransport(): Transport {
   if (typeof window !== "undefined" && window.__TAURI_INTERNALS__) {
     return new TauriTransport();
   }
+  if (!BRIDGE_ENABLED) throw new Error("MoleculeForge's compute engine is only reachable from the desktop app.");
   const params = new URLSearchParams(window.location.search);
   const port = params.get("bridgePort") ?? import.meta.env.VITE_BRIDGE_PORT ?? "8765";
   const token = params.get("bridgeToken") ?? import.meta.env.VITE_BRIDGE_TOKEN ?? "";

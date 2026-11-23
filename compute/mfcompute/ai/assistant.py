@@ -132,10 +132,10 @@ def answer(params: AiQueryParams, ctx: JobContext) -> dict[str, Any]:
         {"role": "system", "content": system_prompt(locale) + "\n\n" + _molecule_context(params)
          + (f"\n\nReference notes:\n{notes_text}" if notes else "")},
     ]
-    for turn in params.history[-8:]:
-        role = turn.get("role")
-        if role in ("user", "assistant") and isinstance(turn.get("content"), str):
-            messages.append({"role": role, "content": turn["content"][:2000]})
+    for past in params.history[-8:]:
+        role = past.get("role")
+        if role in ("user", "assistant") and isinstance(past.get("content"), str):
+            messages.append({"role": role, "content": past["content"][:2000]})
     messages.append({"role": "user", "content": params.prompt})
 
     tool_ctx = tools.ToolContext(params.molecule, ctx)
@@ -153,7 +153,7 @@ def answer(params: AiQueryParams, ctx: JobContext) -> dict[str, Any]:
     final = ""
     for _round in range(MAX_ROUNDS):
         ctx.notify("ai.status", {"stage": "thinking"})
-        turn = llm.stream_chat(messages, tools.schemas(), ctx, stream)
+        turn: dict[str, Any] = llm.stream_chat(messages, tools.schemas(), ctx, stream)
         if not turn["tool_calls"]:
             final = turn["content"]
             break

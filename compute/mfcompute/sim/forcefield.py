@@ -77,7 +77,8 @@ def build_force_field(mol: Chem.Mol, method: str, conf_id: int = -1) -> rdForceF
     if ff is None:
         raise RpcError(CHEMISTRY_ERROR, f"Could not set up {method}", {"code": "NO_FF_PARAMS"})
     ff.Initialize()
-    return ff
+    result: rdForceField.ForceField = ff
+    return result
 
 
 def gradient_rms(ff: rdForceField.ForceField) -> float:

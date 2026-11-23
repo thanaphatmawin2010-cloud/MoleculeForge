@@ -59,3 +59,10 @@
     @apply animate-shimmer rounded;
   }
 }
+
+/* Scientific notation (values with units, formulas, electron configurations, shortcuts) always
+   reads left to right, even inside right-to-left text; isolation keeps the surrounding sentence intact. */
+.ltr-run {
+  direction: ltr;
+  unicode-bidi: isolate;
+}

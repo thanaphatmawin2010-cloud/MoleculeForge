@@ -68,6 +68,11 @@ def _text(value: Any, limit: int = 400) -> str:
     return str(value if value is not None else "")[:limit]
 
 
+def _obj(value: Any) -> dict[str, Any]:
+    """A nested object from the untrusted report, or an empty one."""
+    return value if isinstance(value, dict) else {}
+
+
 def _labels(strings: dict[str, Any] | None) -> dict[str, str]:
     out = dict(DEFAULTS)
     for key, value in (strings or {}).items():
@@ -105,7 +110,7 @@ class _Model:
 
     def __init__(self, report: dict[str, Any], strings: dict[str, Any] | None) -> None:
         self.label = _labels(strings)
-        molecule = report.get("molecule") if isinstance(report.get("molecule"), dict) else {}
+        molecule = _obj(report.get("molecule"))
         self.molecule: dict[str, Any] = molecule
         self.name = _text(molecule.get("name") or "", 120) or "molecule"
         self.formula = _text(molecule.get("formula") or "", 120)
@@ -113,10 +118,10 @@ class _Model:
         status_text = (strings or {}).get("statusText")
         self.status = _text(status_text) if isinstance(status_text, str) and status_text else STATUS_DEFAULTS.get(status, status)
         self.reason = _text(report.get("reason") or "")
-        residual = report.get("residualEnergy") if isinstance(report.get("residualEnergy"), dict) else {}
+        residual = _obj(report.get("residualEnergy"))
         self.energy = (f"{_fmt(residual.get('value'), 6)} {_text(residual.get('unit'), 20)} ({_text(residual.get('method'), 120)})"
                        if isinstance(residual.get("value"), (int, float)) else "—")
-        rmsd = report.get("rmsd") if isinstance(report.get("rmsd"), dict) else {}
+        rmsd = _obj(report.get("rmsd"))
         self.rmsd = f"{_fmt(rmsd.get('value'), 4)} Å" if isinstance(rmsd.get("value"), (int, float)) else "—"
         self.duration = f"{int(report['durationMs'])} ms" if isinstance(report.get("durationMs"), (int, float)) else "—"
         self.fix_lines = _lines(strings, "fixLines") or [
@@ -128,7 +133,7 @@ class _Model:
         ]
         stage_names = (strings or {}).get("stageNames")
         self.stage_names: dict[str, str] = {k: _text(v, 80) for k, v in stage_names.items()} if isinstance(stage_names, dict) else {}
-        changes = report.get("changes") if isinstance(report.get("changes"), dict) else {}
+        changes = _obj(report.get("changes"))
         self.changes: list[tuple[str, list[dict[str, Any]], int]] = []
         for kind, label in (("bonds", "changesBonds"), ("angles", "changesAngles"), ("dihedrals", "changesDihedrals")):
             items = [c for c in (changes.get(kind) or []) if isinstance(c, dict)]
@@ -138,10 +143,10 @@ class _Model:
                       if isinstance(a, dict) and isinstance(a.get("atom"), int)]
         self.removed = [str(int(a["atom"]) + 1) for a in (changes.get("removedAtoms") or [])
                         if isinstance(a, dict) and isinstance(a.get("atom"), int)]
-        check = report.get("geometryCheck") if isinstance(report.get("geometryCheck"), dict) else {}
+        check = _obj(report.get("geometryCheck"))
         self.bond_rows = [r for r in (check.get("bondTable") or []) if isinstance(r, dict)][:MAX_TABLE_ROWS]
         self.angle_rows = [r for r in (check.get("angleTable") or []) if isinstance(r, dict)][:MAX_TABLE_ROWS]
-        contact = check.get("minNonBondedDistance") if isinstance(check.get("minNonBondedDistance"), dict) else {}
+        contact = _obj(check.get("minNonBondedDistance"))
         pair = contact.get("atoms") if isinstance(contact.get("atoms"), list) else None
         self.contact = (f"{_fmt(contact.get('value'), 3)} Å" + (f" ({pair[0] + 1}–{pair[1] + 1})" if pair and len(pair) == 2 else "")
                         if isinstance(contact.get("value"), (int, float)) else None)
@@ -166,7 +171,7 @@ class _Model:
     def check_rows(self) -> list[list[str]]:
         rows = []
         for r in self.bond_rows:
-            ref = r.get("reference") if isinstance(r.get("reference"), dict) else {}
+            ref = _obj(r.get("reference"))
             rows.append([_text(r.get("type"), 60), str(r.get("count", "")), f"{_fmt(r.get('mean'), 4)} Å",
                          f"{_fmt(ref.get('low'), 2)}–{_fmt(ref.get('high'), 2)} Å",
                          self.label["ok"] if r.get("withinTenPercent") else self.label["check"]])
@@ -308,7 +313,9 @@ def to_pdf(model: _Model) -> bytes:
     head_r = ParagraphStyle("headR", parent=head, alignment=TA_RIGHT)
     h1 = ParagraphStyle("h1", parent=base, fontName=bold, fontSize=17, leading=22, spaceAfter=2)
     h2 = ParagraphStyle("h2", parent=base, fontName=bold, fontSize=11.5, leading=15, spaceBefore=10, spaceAfter=4, textColor=accent)
-    p = lambda text, style=base: Paragraph(escape(text), style)  # noqa: E731
+    def p(text: str, style: Any = base) -> Any:
+        return Paragraph(escape(text), style)
+
     L = model.label
 
     def table(header: list[str], rows: list[list[str]], widths: list[float], right: set[int]) -> Table:

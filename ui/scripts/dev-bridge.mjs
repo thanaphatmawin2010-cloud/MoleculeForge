@@ -10,7 +10,7 @@
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -30,10 +30,19 @@ const sidecar = spawn(python, ["-m", "mfcompute.server"], {
   stdio: ["pipe", "pipe", "inherit"],
 });
 
+// Same method allowlist as the desktop shell (single source of truth: app-shell/src-tauri/src/sidecar.rs).
+const shellSource = readFileSync(resolve(repo, "app-shell", "src-tauri", "src", "sidecar.rs"), "utf8");
+const allowBlock = shellSource.slice(shellSource.indexOf("ALLOWED_METHODS"), shellSource.indexOf("];", shellSource.indexOf("ALLOWED_METHODS")));
+const ALLOWED = new Set([...allowBlock.matchAll(/"([a-zA-Z0-9.]+)"/g)].map((m) => m[1]));
+let engineReady = false;
+
 const clients = new Set();
 const backlog = [];
 createInterface({ input: sidecar.stdout }).on("line", (line) => {
-  if (line.includes('"method":"ready"')) backlog.push(line);
+  if (line.includes('"method":"ready"')) {
+    backlog.push(line);
+    engineReady = true;
+  }
   for (const client of clients) client.send(line);
 });
 sidecar.on("exit", (code) => {
@@ -41,7 +50,12 @@ sidecar.on("exit", (code) => {
   process.exit(code ?? 1);
 });
 
-const http = createServer((_req, res) => {
+const http = createServer((req, res) => {
+  if (req.url === "/health") {
+    res.writeHead(engineReady ? 200 : 503, { "content-type": "text/plain" });
+    res.end(engineReady ? "ready" : "starting");
+    return;
+  }
   res.writeHead(404);
   res.end();
 });
@@ -60,6 +74,16 @@ http.on("upgrade", (req, socket, head) => {
     for (const line of backlog) ws.send(line);
     ws.on("message", (data) => {
       const line = String(data).replace(/\n/g, " ");
+      let method = "";
+      try {
+        method = JSON.parse(line).method ?? "";
+      } catch {
+        return;
+      }
+      if (!ALLOWED.has(method)) {
+        console.error(`[bridge] rejected method ${method}`);
+        return;
+      }
       sidecar.stdin.write(line + "\n");
     });
     ws.on("close", () => clients.delete(ws));

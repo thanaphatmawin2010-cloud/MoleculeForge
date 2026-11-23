@@ -38,7 +38,7 @@ def _run(args: list[str], timeout: float = 6.0) -> str:
 def cpu_features() -> dict[str, bool]:
     wanted = ("SSE42", "AVX", "AVX2", "FMA3", "AVX512F", "AVX512_SKX", "NEON", "ASIMD")
     try:
-        from numpy._core._multiarray_umath import __cpu_features__ as feats  # type: ignore[attr-defined]
+        from numpy._core._multiarray_umath import __cpu_features__ as feats  # type: ignore[import-not-found]
 
         return {name.lower(): bool(feats.get(name, False)) for name in wanted if name in feats}
     except ImportError:

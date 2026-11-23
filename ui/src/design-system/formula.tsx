@@ -8,7 +8,7 @@ export function Formula({ value, className }: { value: string | null | undefined
   const body = charge ? value.slice(0, charge.index) : value;
   const parts = body.match(/\d+|[^\d]+/g) ?? [];
   return (
-    <span className={cx("whitespace-nowrap", className)} aria-label={value}>
+    <span className={cx("ltr-run whitespace-nowrap", className)} aria-label={value}>
       {parts.map((part, i) =>
         /^\d+$/.test(part) ? (
           <sub key={i} className="relative -bottom-[0.1em] text-[0.72em] leading-none">

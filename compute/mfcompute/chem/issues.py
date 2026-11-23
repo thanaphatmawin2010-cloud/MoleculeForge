@@ -58,7 +58,7 @@ def make_issue(code: str, *, atoms: list[int] | None = None, bonds: list[int] | 
         message = template.format(**params)
     except (KeyError, IndexError, ValueError):
         message = template
-    return Issue(code=code, severity=severity, message=message, atoms=atoms or [], bonds=bonds or [], params=params)  # type: ignore[arg-type]
+    return Issue(code=code, severity=severity, message=message, atoms=atoms or [], bonds=bonds or [], params=params)
 
 
 def describe_fix(op: str, **params: Any) -> str:

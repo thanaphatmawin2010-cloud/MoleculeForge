@@ -6,7 +6,8 @@ UFF fallback) → optional GFN2-xTB refinement → diff + report.
 
 Idempotency: when the input is already chemically valid with a usable geometry, only the
 final-stage method is run from the current coordinates; if the structure moves less than
-``OPTIMAL_RMSD`` the original coordinates are returned unchanged and the report says
+``OPTIMAL_RMSD`` (or the energy changes by less than ``OPTIMAL_DE``) the original coordinates are
+returned unchanged and the report says
 ``already-optimal``.
 """
 
@@ -21,17 +22,19 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
+from .. import capabilities
 from ..jobs import JobContext
 from ..models import Molecule
 from ..rpc import RpcError
-from ..sim import forcefield, xtb
+from ..sim import dft, forcefield, xtb
 from . import convert, reference, validate
 
-OPTIMAL_RMSD = 0.02  # Å
+OPTIMAL_RMSD = 0.005  # Å: a fresh optimisation moves further; a re-run of a converged one does not
 # MMFF94 lacks parameters for some species (e.g. cumulated C=O in CO2, where it falls back to an
 # empirical 1.405 Å rule), so "auto" refinement finishes small/medium systems with GFN2-xTB.
 AUTO_XTB_MAX_ATOMS = 300
 OPTIMAL_DE = 0.05  # kcal/mol
+DFT_FINAL = "B3LYP/def2-SVP"
 MAX_LISTED_CHANGES = 2000
 HYBRID_STERIC = {
     Chem.HybridizationType.SP: 2,
@@ -250,7 +253,7 @@ def geometry_tables(mol: Chem.Mol) -> dict[str, Any]:
                             "min": round(float(vals.min()), 3), "max": round(float(vals.max()), 3), "unit": "°",
                             "ideal": None, "range": None, "withinTenPercent": True})
     pos = mol.GetConformer().GetPositions()
-    min_nb = {"value": None, "unit": "Å", "atoms": None}
+    min_nb: dict[str, Any] = {"value": None, "unit": "Å", "atoms": None}
     if len(pos) > 1:
         from scipy.spatial import cKDTree
 
@@ -325,6 +328,9 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
             "durationMs": int((time.perf_counter() - started) * 1000),
         }
     final_method = "GFN2-xTB" if use_xtb else str(ff_name)
+    # Tiny molecules get a B3LYP geometry: GFN2-xTB is too coarse there (water opens to 107°).
+    if refine == "auto" and dft.can_optimize(rd_h):
+        final_method = DFT_FINAL
     if refine == "gfn2-xtb" and final_method != "GFN2-xTB":
         methods.append({"stage": "refine", "method": "GFN2-xTB", "details": "skipped: engine unavailable or element outside H–Rn"})
     if ff_name is None:
@@ -341,7 +347,7 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
     candidate_optimal = chemically_clean and usable and not added and not embedded
     total_cycles = 0
     ff_result = None
-    if ff_name is not None and (final_method != "GFN2-xTB" or embedded or added or not usable):
+    if ff_name is not None and (final_method not in ("GFN2-xTB", DFT_FINAL) or embedded or added or not usable):
         ff_result = forcefield.minimize(rd_h, ff_name, ctx, max_steps=5000, stage="minimize", percent_from=25, percent_to=70)
         methods.append({"stage": "minimize", "method": ff_name, "details": f"{ff_result.iterations} steps, converged={ff_result.converged}"})
     xtb_result = None
@@ -360,13 +366,25 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
                     conf.SetAtomPosition(idx, (x, y, z))
             if xtb_result.converged:
                 break
+        assert xtb_result is not None  # the loop above runs at least once
         methods.append({"stage": "refine", "method": "GFN2-xTB (ANC optimiser, tight)",
                         "details": f"{total_cycles} cycles, converged={xtb_result.converged}"})
+
+    dft_result: dict[str, Any] | None = None
+    if final_method == DFT_FINAL:
+        dft_result = dft.optimize(rd_h, ctx, threads=capabilities.recommended_threads(), percent_from=60, percent_to=95, stage="refine")
+        conf = rd_h.GetConformer()
+        for idx, (x, y, z) in enumerate(dft_result["coordinates"]):
+            conf.SetAtomPosition(idx, (x, y, z))
+        methods.append({"stage": "refine", "method": dft.OPT_METHOD,
+                        "details": f"{dft_result['steps']} steps, converged={dft_result['converged']}"})
 
     final_coords = rd_h.GetConformer().GetPositions()
     common = min(len(start_coords), len(final_coords))
     rmsd = kabsch_rmsd(np.asarray(start_coords[:common]), np.asarray(final_coords[:common])) if not embedded else None
-    if xtb_result is not None and xtb_start_energy is not None and xtb_result.energy_hartree is not None:
+    if dft_result is not None:
+        energy_change = abs(dft_result["initialEnergy"] - dft_result["energy"]) * dft.HARTREE_TO_KCAL
+    elif xtb_result is not None and xtb_start_energy is not None and xtb_result.energy_hartree is not None:
         energy_change = abs(xtb_start_energy - xtb_result.energy_hartree) * xtb.HARTREE_TO_KCAL
     elif ff_result is not None:
         energy_change = abs(ff_result.energy_final - ff_result.energy_initial)
@@ -393,7 +411,9 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
     tables = geometry_tables(rd_report)
     final_issues, _ = validate.detect(final_molecule)
     residual: dict[str, Any]
-    if xtb_result is not None and xtb_result.energy_hartree is not None:
+    if dft_result is not None:
+        residual = {"value": round(dft_result["energy"], 8), "unit": "Eh", "method": "B3LYP/def2-SVP total energy"}
+    elif xtb_result is not None and xtb_result.energy_hartree is not None:
         residual = {"value": round(xtb_result.energy_hartree, 8), "unit": "Eh", "method": "GFN2-xTB total energy"}
     else:
         if ff_name is not None:
@@ -415,6 +435,8 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
             "forceField": ff_result.as_dict() if ff_result else None,
             "xtb": {"method": "GFN2-xTB", "converged": xtb_result.converged, "cycles": total_cycles,
                     "energy": xtb_result.energy_hartree, "unit": "Eh"} if xtb_result else None,
+            "dft": {"method": dft.OPT_METHOD, "converged": dft_result["converged"], "steps": dft_result["steps"],
+                    "energy": dft_result["energy"], "unit": "Eh"} if dft_result else None,
         },
         "residualEnergy": residual,
         "rmsd": {"value": round(rmsd, 4) if rmsd is not None else None, "unit": "Å",

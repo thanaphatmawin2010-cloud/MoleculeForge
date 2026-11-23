@@ -30,6 +30,8 @@ export function PeriodicGrid({ elements, compact = false, selected = null, highl
   return (
     <div
       role="grid"
+      // The periodic table's layout (group 1 on the left) is a scientific convention: never mirrored.
+      dir="ltr"
       aria-label={t("periodic.gridLabel")}
       className={cx("grid gap-[3px]", compact ? "grid-cols-[repeat(18,minmax(0,28px))]" : "grid-cols-[repeat(18,minmax(0,1fr))]")}
       style={{ gridTemplateRows: compact ? "repeat(7, 28px) 8px repeat(2, 28px)" : "repeat(7, minmax(0,1fr)) 10px repeat(2, minmax(0,1fr))" }}

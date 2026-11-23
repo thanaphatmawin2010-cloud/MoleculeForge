@@ -90,6 +90,7 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
     started = time.perf_counter()
     limits = LIMITS[params.level]
     warnings: list[str] = []
+    failed_steps: list[str] = []
     methods_used: list[str] = []
     ctx.progress(1, "prepare", "Preparing structure", force=True)
     mol = convert.to_rdkit(params.molecule)
@@ -105,7 +106,8 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
             cached["jobId"] = ctx.job_id
             cached["warnings"] = [*cached.get("warnings", []), "Result served from the local cache (same InChIKey and method)."]
             ctx.progress(100, "done", "Loaded cached result", force=True)
-            return cached
+            result_cached: dict[str, Any] = cached
+            return result_cached
 
     props: dict[str, dict[str, Any]] = {}
     data: dict[str, Any] = {}
@@ -164,6 +166,7 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
             if err.code == -32000:
                 raise
             warnings.append(f"GFN2-xTB step skipped: {err.message}")
+            failed_steps.append("GFN2-xTB")
     elif not xtb.supports(mol):
         warnings.append("GFN2-xTB covers H–Rn only; tight-binding properties were not computed.")
 
@@ -175,6 +178,7 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
             if err.code == -32000:
                 raise
             warnings.append(f"PM7 heat of formation unavailable: {err.message}")
+            failed_steps.append("PM7")
 
     if limits["dft"] and dft.supported(mol) and n_heavy <= limits["dft"]:
         try:
@@ -203,6 +207,7 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
             if err.code == -32000:
                 raise
             warnings.append(f"DFT step skipped: {err.message}")
+            failed_steps.append("DFT")
     elif limits["dft"] and n_heavy > limits["dft"]:
         warnings.append(f"DFT skipped: {n_heavy} heavy atoms exceeds the {params.level} limit of {limits['dft']}; tight-binding values are reported.")
 
@@ -233,7 +238,9 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
         "warnings": warnings,
         "data": {**data, "methods": methods_used, "geometryMethod": geometry_method},
     }
-    if use_cache:
+    # A result in which an engine failed (rather than being skipped by a size limit) is not
+    # reproducible, so it is never cached: the next run must try the engine again.
+    if use_cache and not failed_steps:
         with _CACHE_LOCK:
             conn = _cache()
             conn.execute("INSERT OR REPLACE INTO results VALUES (?, ?, ?)",

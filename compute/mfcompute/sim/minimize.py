@@ -28,7 +28,7 @@ def _prepare(molecule: Any) -> Chem.Mol:
 def run(params: MinimizeParams, ctx: JobContext) -> dict[str, Any]:
     started = time.perf_counter()
     mol = _prepare(params.molecule)
-    method = params.method
+    method: str = params.method
     if method == "auto":
         method = forcefield.choose_force_field(mol)
     properties: dict[str, dict[str, Any]] = {}

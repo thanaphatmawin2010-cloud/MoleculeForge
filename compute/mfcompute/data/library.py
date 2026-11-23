@@ -205,7 +205,8 @@ class LibraryStore:
             molecules = [Molecule.model_validate(item.get("molecule", item)) for item in items]
         else:
             molecules = convert.parse("sdf", params.data, embed3d=True)
-        saved, duplicates = [], []
+        saved: list[Any] = []
+        duplicates: list[Any] = []
         for idx, molecule in enumerate(molecules):
             ctx.check()
             ctx.progress(100 * idx / max(1, len(molecules)), "import", molecule.name or molecule.id)

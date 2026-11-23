@@ -50,7 +50,7 @@ export const MoleculeSchema = z.object({
   formula: z.string(),
   atoms: z.array(AtomSchema),
   bonds: z.array(BondSchema),
-  props: z.record(z.unknown()),
+  props: z.record(z.string(), z.unknown()),
   meta: MoleculeMetaSchema,
 });
 
@@ -67,7 +67,7 @@ export const IssueSchema = z.object({
   message: z.string(),
   atoms: z.array(z.number().int()),
   bonds: z.array(z.number().int()),
-  params: z.record(z.unknown()),
+  params: z.record(z.string(), z.unknown()),
 });
 
 export const SimulationResultSchema = z.object({
@@ -79,20 +79,19 @@ export const SimulationResultSchema = z.object({
   converged: z.boolean(),
   durationMs: z.number(),
   geometry: MoleculeSchema,
-  properties: z.record(PropertyValueSchema),
+  properties: z.record(z.string(), PropertyValueSchema),
   warnings: z.array(z.string()),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const FixLogSchema = z.object({
-  before: z.record(z.unknown()),
+  before: z.record(z.string(), z.unknown()),
   reason: z.string(),
   /** Parameters of the issue that triggered the fix (1-based atom numbers) for issues:code.<reason>. */
-  reasonParams: z.record(z.unknown()).default({}),
-  fix: z
-    .record(z.unknown())
-    .and(z.object({ description: z.string(), op: z.string(), params: z.record(z.unknown()).default({}) })),
-  after: z.record(z.unknown()),
+  reasonParams: z.record(z.string(), z.unknown()).default({}),
+  // Operation-specific fields (bond, atom, order, …) plus the common description/op/params.
+  fix: z.looseObject({ description: z.string(), op: z.string(), params: z.record(z.string(), z.unknown()).default({}) }),
+  after: z.record(z.string(), z.unknown()),
 });
 export type FixLog = z.infer<typeof FixLogSchema>;
 
@@ -112,7 +111,7 @@ export const ValidationResultSchema = z.object({
   issues: z.array(IssueSchema),
   initialIssues: z.array(IssueSchema).optional(),
   fixes: z.array(FixLogSchema),
-  ops: z.array(z.record(z.unknown())),
+  ops: z.array(z.record(z.string(), z.unknown())),
   molecule: MoleculeSchema,
   atomMap: z.array(z.number().int()),
   durationMs: z.number(),
@@ -172,7 +171,7 @@ export const RepairReportSchema = z.object({
     })
     .optional(),
   methods: z.array(z.object({ stage: z.string(), method: z.string(), details: z.string() })).optional(),
-  convergence: z.record(z.unknown()).optional(),
+  convergence: z.record(z.string(), z.unknown()).optional(),
   residualEnergy: z.object({ value: z.number().nullable(), unit: z.string(), method: z.string() }).optional(),
   rmsd: z.object({ value: z.number().nullable(), unit: z.string(), note: z.string() }).optional(),
   geometryCheck: z
@@ -216,7 +215,7 @@ export const ProgressSchema = z.object({
   percent: z.number(),
   stage: z.string(),
   message: z.string(),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const RpcErrorSchema = z.object({ code: z.number(), message: z.string(), data: z.unknown().optional() });
@@ -225,7 +224,7 @@ export const RpcErrorSchema = z.object({ code: z.number(), message: z.string(), 
 // error response (result undefined), turning engine errors into confusing validation failures.
 export const RpcMessageSchema = z.union([
   z.object({ jsonrpc: z.literal("2.0"), id: z.union([z.string(), z.number(), z.null()]), error: RpcErrorSchema }),
-  z.object({ jsonrpc: z.literal("2.0"), method: z.string(), params: z.record(z.unknown()) }),
+  z.object({ jsonrpc: z.literal("2.0"), method: z.string(), params: z.record(z.string(), z.unknown()) }),
   z.object({ jsonrpc: z.literal("2.0"), id: z.union([z.string(), z.number()]), result: z.unknown() }),
 ]);
 
