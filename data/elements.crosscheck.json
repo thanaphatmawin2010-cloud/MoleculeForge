@@ -1,0 +1,271 @@
+{
+ "status": "ok",
+ "source": "https://raw.githubusercontent.com/Bowserinator/Periodic-Table-JSON/master/PeriodicTableJSON.json",
+ "compared": 118,
+ "discrepancies": [
+  {
+   "Z": 5,
+   "symbol": "B",
+   "field": "density",
+   "ours": 2.34,
+   "theirs": 2.08,
+   "tolerance": 0.05
+  },
+  {
+   "Z": 6,
+   "symbol": "C",
+   "field": "density",
+   "ours": 2.2,
+   "theirs": 1.821,
+   "tolerance": 0.05
+  },
+  {
+   "Z": 6,
+   "symbol": "C",
+   "field": "boilingPointK",
+   "ours": 4098.15,
+   "theirs": 3915,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 28,
+   "symbol": "Ni",
+   "field": "boilingPointK",
+   "ours": 3186.15,
+   "theirs": 3003,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 31,
+   "symbol": "Ga",
+   "field": "boilingPointK",
+   "ours": 2502.15,
+   "theirs": 2673,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 33,
+   "symbol": "As",
+   "field": "meltingPointK",
+   "ours": 1090.15,
+   "theirs": 887,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 39,
+   "symbol": "Y",
+   "field": "boilingPointK",
+   "ours": 3618.15,
+   "theirs": 3203,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 43,
+   "symbol": "Tc",
+   "field": "atomicMass",
+   "ours": 97.0,
+   "theirs": 98,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 43,
+   "symbol": "Tc",
+   "field": "firstIonizationEnergy",
+   "ours": 686.916,
+   "theirs": 702,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 51,
+   "symbol": "Sb",
+   "field": "boilingPointK",
+   "ours": 1860.15,
+   "theirs": 1908,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 59,
+   "symbol": "Pr",
+   "field": "boilingPointK",
+   "ours": 3793.15,
+   "theirs": 3403,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 62,
+   "symbol": "Sm",
+   "field": "boilingPointK",
+   "ours": 2067.15,
+   "theirs": 2173,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 64,
+   "symbol": "Gd",
+   "field": "boilingPointK",
+   "ours": 3546.15,
+   "theirs": 3273,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 65,
+   "symbol": "Tb",
+   "field": "boilingPointK",
+   "ours": 3503.15,
+   "theirs": 3396,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 67,
+   "symbol": "Ho",
+   "field": "boilingPointK",
+   "ours": 2973.15,
+   "theirs": 2873,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 73,
+   "symbol": "Ta",
+   "field": "firstIonizationEnergy",
+   "ours": 728.423,
+   "theirs": 761,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 74,
+   "symbol": "W",
+   "field": "boilingPointK",
+   "ours": 5828.15,
+   "theirs": 6203,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 74,
+   "symbol": "W",
+   "field": "firstIonizationEnergy",
+   "ours": 758.764,
+   "theirs": 770,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 76,
+   "symbol": "Os",
+   "field": "firstIonizationEnergy",
+   "ours": 814.165,
+   "theirs": 840,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 77,
+   "symbol": "Ir",
+   "field": "boilingPointK",
+   "ours": 4701.15,
+   "theirs": 4403,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 77,
+   "symbol": "Ir",
+   "field": "firstIonizationEnergy",
+   "ours": 865.186,
+   "theirs": 880,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 79,
+   "symbol": "Au",
+   "field": "boilingPointK",
+   "ours": 3109.15,
+   "theirs": 3243,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 85,
+   "symbol": "At",
+   "field": "density",
+   "ours": 7.0,
+   "theirs": 6.35,
+   "tolerance": 0.05
+  },
+  {
+   "Z": 87,
+   "symbol": "Fr",
+   "field": "electronegativityPauling",
+   "ours": 0.7,
+   "theirs": 0.79,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 87,
+   "symbol": "Fr",
+   "field": "firstIonizationEnergy",
+   "ours": 392.96,
+   "theirs": 380,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 88,
+   "symbol": "Ra",
+   "field": "density",
+   "ours": 5.0,
+   "theirs": 5.5,
+   "tolerance": 0.05
+  },
+  {
+   "Z": 88,
+   "symbol": "Ra",
+   "field": "meltingPointK",
+   "ours": 969.15,
+   "theirs": 1233,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 89,
+   "symbol": "Ac",
+   "field": "meltingPointK",
+   "ours": 1323.15,
+   "theirs": 1500,
+   "tolerance": 0.02
+  },
+  {
+   "Z": 89,
+   "symbol": "Ac",
+   "field": "firstIonizationEnergy",
+   "ours": 519.114,
+   "theirs": 499,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 90,
+   "symbol": "Th",
+   "field": "firstIonizationEnergy",
+   "ours": 608.504,
+   "theirs": 587,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 103,
+   "symbol": "Lr",
+   "field": "firstIonizationEnergy",
+   "ours": 478.567,
+   "theirs": 470,
+   "tolerance": 0.01
+  },
+  {
+   "Z": 114,
+   "symbol": "Fl",
+   "field": "density",
+   "ours": 9.928,
+   "theirs": 14,
+   "tolerance": 0.05
+  },
+  {
+   "Z": 118,
+   "symbol": "Og",
+   "field": "density",
+   "ours": 7.0,
+   "theirs": 4.95,
+   "tolerance": 0.05
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+compute/.venv/
+compute/build/
+compute/dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+# Node / UI
+node_modules/
+ui/dist/
+ui/coverage/
+ui/test-results/
+ui/playwright-report/
+# Rust / Tauri
+app-shell/src-tauri/target/
+app-shell/src-tauri/gen/
+app-shell/src-tauri/resources/
+# Bundled engines and models are fetched + hash-verified by scripts/fetch_engines.py
+engines/*/
+!engines/README.md
+data/models/*.gguf
+data/models/*.part
+# OS / editors
+.DS_Store
+*.swp

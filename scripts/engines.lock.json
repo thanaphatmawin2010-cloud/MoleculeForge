@@ -1,0 +1,55 @@
+{
+  "$comment": "Pinned third-party engines bundled with MoleculeForge. fetch_engines.py downloads and verifies these; nothing is fetched at runtime.",
+  "micromamba": {
+    "version": "2.10.0",
+    "license": "BSD-3-Clause",
+    "source": "https://conda.anaconda.org/conda-forge/{subdir}/micromamba-2.10.0-0.tar.bz2"
+  },
+  "xtb": {
+    "version": "6.8.0",
+    "license": "LGPL-3.0-or-later",
+    "homepage": "https://github.com/grimme-lab/xtb",
+    "conda_spec": "xtb=6.8.0",
+    "channel": "conda-forge"
+  },
+  "mopac": {
+    "version": "23.2.5",
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/openmopac/mopac",
+    "conda_spec": "mopac=23.2.5",
+    "channel": "conda-forge"
+  },
+  "vina": {
+    "version": "1.2.7",
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/ccsb-scripps/AutoDock-Vina",
+    "assets": {
+      "linux-x64": "https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.7/vina_1.2.7_linux_x86_64",
+      "macos-x64": "https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.7/vina_1.2.7_mac_x86_64",
+      "macos-arm64": "https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.7/vina_1.2.7_mac_aarch64",
+      "windows-x64": "https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.7/vina_1.2.7_win.exe"
+    }
+  },
+  "llama_cpp": {
+    "tag": "b12650",
+    "license": "MIT",
+    "repo": "https://github.com/ggml-org/llama.cpp",
+    "cmake_common": ["-DCMAKE_BUILD_TYPE=Release", "-DLLAMA_CURL=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_SERVER=ON", "-DGGML_BACKEND_DL=ON", "-DGGML_CPU_ALL_VARIANTS=ON", "-DGGML_NATIVE=OFF", "-DBUILD_SHARED_LIBS=ON"],
+    "cmake_gpu": {
+      "linux-x64": ["-DGGML_VULKAN=ON"],
+      "windows-x64": ["-DGGML_VULKAN=ON"],
+      "macos-arm64": ["-DGGML_METAL=ON"],
+      "macos-x64": ["-DGGML_METAL=OFF"]
+    }
+  },
+  "model": {
+    "name": "Qwen3-4B-Instruct-2507",
+    "quantization": "Q4_K_M",
+    "license": "Apache-2.0",
+    "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+    "revision": "a06e946bb6b655725eafa393f4a9745d460374c9",
+    "file": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+    "size": 2497281120,
+    "sha256": "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597"
+  }
+}
