@@ -87,7 +87,7 @@ def _worker(payload: dict[str, Any], out: Any) -> None:  # pragma: no cover - ru
             alpha = 0.5 * (alpha + alpha.T)
             result["polarizability"] = {"tensorAu": alpha.tolist(), "isotropicAu": float(np.trace(alpha) / 3.0)}
         out.put(("result", result))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         out.put(("error", f"{type(exc).__name__}: {exc}"))
 
 

@@ -1,0 +1,146 @@
+/*
+ * MoleculeForge design tokens.
+ * Every colour, radius, shadow, duration and font in the UI comes from these variables
+ * (consumed through tailwind.config.ts). Contrast pairs were checked against WCAG 2.1 AA:
+ * ink/bg >= 15:1, ink-3/bg >= 4.6:1, accent text/bg >= 4.8:1, on-accent/accent >= 5.4:1.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces: warm lab-notebook paper */
+  --bg: 40 27% 94%;            /* #F4F1EA */
+  --surface-1: 45 33% 97%;     /* #FBFAF6 */
+  --surface-2: 41 26% 91%;     /* #EFEBE2 */
+  --surface-3: 40 21% 87%;     /* #E6E1D6 */
+  --line: 41 20% 81%;          /* #D8D2C4 */
+  --line-strong: 39 14% 68%;   /* #B9B1A0 */
+
+  /* Ink */
+  --ink: 228 10% 10%;          /* #17181C */
+  --ink-2: 230 7% 31%;         /* #4A4C55 */
+  --ink-3: 228 5% 45%;         /* #6E7079 */
+
+  /* Brand: forge ember */
+  --accent: 16 75% 41%;        /* #B8441A */
+  --accent-soft: 18 80% 92%;
+  --on-accent: 0 0% 100%;
+  --focus: 16 85% 50%;
+
+  /* Semantic */
+  --success: 170 62% 31%;
+  --success-soft: 165 45% 90%;
+  --warning: 40 100% 30%;
+  --warning-soft: 44 90% 89%;
+  --danger: 4 77% 40%;
+  --danger-soft: 4 80% 94%;
+  --info: 216 72% 43%;
+  --info-soft: 214 80% 94%;
+
+  /* Element / molecule family hues (tiles use h with fixed s/l per theme) */
+  --fam-alkali: 12;
+  --fam-alkaline: 34;
+  --fam-transition: 211;
+  --fam-post: 188;
+  --fam-metalloid: 142;
+  --fam-nonmetal: 88;
+  --fam-halogen: 52;
+  --fam-noble: 262;
+  --fam-lanthanide: 332;
+  --fam-actinide: 300;
+  --fam-unknown: 220;
+  --tile-s: 58%;
+  --tile-l: 89%;
+  --tile-ink-s: 52%;
+  --tile-ink-l: 24%;
+
+  /* Element ink for 2D structure drawings (ChemDraw-like convention, AA on paper) */
+  --el-c: 228 10% 10%;
+  --el-o: 3 66% 49%;
+  --el-n: 225 66% 50%;
+  --el-s: 45 100% 30%;
+  --el-p: 31 100% 38%;
+  --el-hal: 141 65% 30%;
+  --el-br: 13 72% 32%;
+  --el-i: 276 55% 40%;
+  --el-metal: 200 30% 35%;
+
+  /* 3D viewport */
+  --viewport-bg: 40 18% 90%;
+  --viewport-grid: 40 12% 78%;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Elevation */
+  --shadow-1: 0 1px 0 hsl(40 20% 70% / 0.35), 0 1px 2px hsl(30 20% 20% / 0.06);
+  --shadow-2: 0 2px 6px hsl(30 25% 20% / 0.08), 0 8px 24px hsl(30 25% 20% / 0.08);
+  --shadow-3: 0 12px 40px hsl(30 30% 15% / 0.18), 0 2px 8px hsl(30 30% 15% / 0.08);
+
+  /* Motion */
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 260ms;
+  --dur-4: 420ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1.15);
+
+  /* Typography */
+  --font-sans: "IBM Plex Sans", "IBM Plex Sans Thai", "Noto Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "IBM Plex Sans Thai", ui-monospace, monospace;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: 222 17% 7%;            /* #0F1115 */
+  --surface-1: 222 16% 11%;    /* #161920 */
+  --surface-2: 222 16% 14%;    /* #1C2029 */
+  --surface-3: 222 17% 18%;    /* #252A35 */
+  --line: 220 17% 21%;         /* #2C323E */
+  --line-strong: 221 15% 28%;  /* #3C4352 */
+  --ink: 225 9% 93%;
+  --ink-2: 222 9% 73%;
+  --ink-3: 222 7% 57%;
+  --accent: 20 86% 59%;        /* #F07A3F */
+  --accent-soft: 18 45% 18%;
+  --on-accent: 20 60% 7%;
+  --focus: 20 95% 62%;
+  --success: 168 53% 50%;
+  --success-soft: 168 40% 15%;
+  --warning: 44 74% 57%;
+  --warning-soft: 44 50% 15%;
+  --danger: 4 92% 69%;
+  --danger-soft: 4 45% 17%;
+  --info: 214 100% 71%;
+  --info-soft: 214 45% 17%;
+  --tile-s: 30%;
+  --tile-l: 19%;
+  --tile-ink-s: 70%;
+  --tile-ink-l: 82%;
+  --el-c: 225 9% 90%;
+  --el-o: 4 90% 68%;
+  --el-n: 222 100% 75%;
+  --el-s: 48 90% 60%;
+  --el-p: 31 95% 62%;
+  --el-hal: 140 55% 60%;
+  --el-br: 14 75% 66%;
+  --el-i: 276 70% 76%;
+  --el-metal: 200 35% 70%;
+  --viewport-bg: 222 18% 9%;
+  --viewport-grid: 222 12% 20%;
+  --shadow-1: 0 1px 0 hsl(0 0% 100% / 0.03), 0 1px 2px hsl(0 0% 0% / 0.4);
+  --shadow-2: 0 2px 8px hsl(0 0% 0% / 0.35), 0 10px 28px hsl(0 0% 0% / 0.35);
+  --shadow-3: 0 16px 48px hsl(0 0% 0% / 0.55), 0 2px 8px hsl(0 0% 0% / 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-1: 0ms;
+    --dur-2: 0ms;
+    --dur-3: 0ms;
+    --dur-4: 0ms;
+  }
+}

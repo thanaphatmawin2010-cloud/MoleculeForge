@@ -30,7 +30,7 @@ from typing import Any, TextIO
 
 from pydantic import ValidationError
 
-from . import __version__
+from . import __version__, runtime
 from .jobs import JobContext
 from .registry import METHODS, MethodSpec
 from .rpc import (
@@ -130,14 +130,23 @@ class Server:
         if not isinstance(raw_params, dict):
             self._error(req_id, RpcError(INVALID_PARAMS, "params must be an object"))
             return
+        # ``jobId`` is a transport-level field (progress routing + cancellation) that every client
+        # request may carry; it is only passed on to parameter models that declare it.
+        raw_params = dict(raw_params)
+        job_field = raw_params.pop("jobId", None)
+        job_id = job_field if isinstance(job_field, str) and 0 < len(job_field) <= 128 else None
+        if spec.params is not None and job_id is not None and "jobId" in spec.params.model_fields:
+            raw_params["jobId"] = job_id
         try:
             params = spec.params.model_validate(raw_params) if spec.params is not None else raw_params
         except ValidationError as exc:
             details = [{"loc": ".".join(str(p) for p in e["loc"]), "msg": e["msg"]} for e in exc.errors()[:20]]
             self._error(req_id, RpcError(INVALID_PARAMS, "Invalid params", details))
             return
-        job_id = raw_params.get("jobId") if isinstance(raw_params.get("jobId"), str) else None
-        ctx = JobContext(job_id or f"job-{uuid.uuid4().hex[:12]}", self.notify)
+        # Control requests (job.cancel, ai.cancel, ping …) name *another* job in ``jobId``; they get
+        # their own id and are never registered as cancellable work.
+        own_id = f"ctl-{uuid.uuid4().hex[:12]}" if spec.kind == "control" else (job_id or f"job-{uuid.uuid4().hex[:12]}")
+        ctx = JobContext(own_id, self.notify)
         pool = {"interactive": self._interactive, "control": None, "job": self._jobs, "ai": self._ai}[spec.kind]
         if pool is None:
             self._run(spec, params, ctx, req_id)
@@ -153,19 +162,23 @@ class Server:
             wait_futures(pending, timeout=timeout)
 
     def _run(self, spec: MethodSpec, params: Any, ctx: JobContext, req_id: Any) -> None:
-        with self._active_lock:
-            self._active[ctx.job_id] = ctx
+        cancellable = spec.kind != "control"
+        if cancellable:
+            with self._active_lock:
+                self._active[ctx.job_id] = ctx
         try:
             result = spec.handler(params, ctx)
             self._respond(req_id, jsonable(result))
         except RpcError as err:
             self._error(req_id, err)
-        except Exception as exc:  # noqa: BLE001 - every failure becomes a typed RPC error
+        except Exception as exc:
             log.error("method %s failed: %s\n%s", spec.name, exc, traceback.format_exc())
             self._error(req_id, RpcError(INTERNAL_ERROR, f"{type(exc).__name__}: {exc}", {"method": spec.name}))
         finally:
-            with self._active_lock:
-                self._active.pop(ctx.job_id, None)
+            if cancellable:
+                with self._active_lock:
+                    if self._active.get(ctx.job_id) is ctx:
+                        self._active.pop(ctx.job_id, None)
 
     def shutdown(self) -> None:
         self.shutting_down.set()
@@ -177,7 +190,6 @@ class Server:
             pool.shutdown(wait=False, cancel_futures=True)
 
 
-SERVER: Server | None = None
 
 
 def _configure_logging() -> None:
@@ -205,21 +217,15 @@ def _protocol_stream() -> TextIO:
 
 
 def main() -> None:
-    multiprocessing.freeze_support()
-    if len(sys.argv) > 1 and sys.argv[1] == "--worker":
-        from .workers import worker_main
-
-        worker_main(sys.argv[2:])
-        return
+    multiprocessing.freeze_support()  # PySCF runs in a spawned child process (frozen builds)
     out = _protocol_stream()
     _configure_logging()
     os.environ.setdefault("OMP_NUM_THREADS", str(max(1, (os.cpu_count() or 2) - 1)))
 
     from . import handlers  # noqa: F401 - registers all RPC methods
 
-    global SERVER
     server = Server(out)
-    SERVER = server
+    runtime.SERVER = server
     server.notify("ready", {"version": __version__, "pid": os.getpid(), "methods": sorted(METHODS)})
     log.info("MoleculeForge compute %s ready (%d methods)", __version__, len(METHODS))
     try:

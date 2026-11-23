@@ -23,9 +23,11 @@ from .models import (
     MinimizeParams,
     MoleculeParams,
     PropertiesParams,
+    RelaxParams,
     RepairParams,
     ReportExportParams,
     ValidateParams,
+    WedgesParams,
 )
 from .registry import method
 from .rpc import CHEMISTRY_ERROR, RpcError
@@ -52,20 +54,20 @@ def system_capabilities(params: dict[str, Any], ctx: JobContext) -> dict[str, An
 @method("system.shutdown", kind="control")
 def system_shutdown(params: dict[str, Any], ctx: JobContext) -> dict[str, Any]:
     """Stop all jobs and exit after replying."""
-    from . import server
+    from . import runtime
 
-    if server.SERVER is not None:
-        server.SERVER.cancel_all()
-        server.SERVER.shutting_down.set()
+    if runtime.SERVER is not None:
+        runtime.SERVER.cancel_all()
+        runtime.SERVER.shutting_down.set()
     return {"ok": True}
 
 
 @method("job.cancel", JobRef, kind="control")
 def job_cancel(params: JobRef, ctx: JobContext) -> dict[str, Any]:
     """Cancel a running job by id."""
-    from . import server
+    from . import runtime
 
-    found = server.SERVER.cancel(params.jobId) if server.SERVER is not None else False
+    found = runtime.SERVER.cancel(params.jobId) if runtime.SERVER is not None else False
     return {"jobId": params.jobId, "cancelled": found}
 
 
@@ -104,12 +106,12 @@ def chem_repair_geometry(params: RepairParams, ctx: JobContext) -> dict[str, Any
     return geometry.repair(params.molecule, refine=params.refine, force_field=params.forceField, ctx=ctx)
 
 
-@method("chem.relax", MinimizeParams, kind="job")
-def chem_relax(params: MinimizeParams, ctx: JobContext) -> dict[str, Any]:
-    """Fast local force-field relaxation used while editing (streams frames)."""
+@method("chem.relax", RelaxParams, kind="job")
+def chem_relax(params: RelaxParams, ctx: JobContext) -> dict[str, Any]:
+    """Fast local force-field relaxation used while editing (streams frames); optionally adds hydrogens."""
     from .chem import geometry
 
-    return {"molecule": geometry.quick_relax(params.molecule, ctx, max_steps=min(params.maxSteps, 400))}
+    return {"molecule": geometry.quick_relax(params.molecule, ctx, max_steps=params.maxSteps, add_hydrogens=params.addHydrogens)}
 
 
 @method("chem.descriptors", MoleculeParams)
@@ -140,17 +142,21 @@ def chem_convert_format(params: ConvertParams, ctx: JobContext) -> dict[str, Any
 
 @method("chem.layout2d", MoleculeParams)
 def chem_layout_2d(params: MoleculeParams, ctx: JobContext) -> dict[str, Any]:
-    """Publication-style 2D depiction coordinates (RDKit CoordGen) for the sketcher."""
-    from rdkit.Chem import rdDepictor
-
-    from .chem import convert
+    """Publication-style 2D depiction coordinates (skeleton via CoordGen, hydrogens placed around it)."""
+    from .chem import convert, depict
 
     mol = convert.to_rdkit(params.molecule, sanitize=False)
     mol.UpdatePropertyCache(strict=False)
-    rdDepictor.SetPreferCoordGen(True)
-    rdDepictor.Compute2DCoords(mol)
-    pos = mol.GetConformer().GetPositions()
-    return {"layout2d": [[round(float(x), 4), round(float(y), 4)] for x, y, _ in pos]}
+    return {"layout2d": depict.layout_2d(mol)}
+
+
+@method("chem.wedges", WedgesParams)
+def chem_wedges(params: WedgesParams, ctx: JobContext) -> dict[str, Any]:
+    """Wedge/hash bonds expressing the 3D stereocentres in the given 2D layout."""
+    from .chem import convert, depict
+
+    rd = convert.to_rdkit(params.molecule)
+    return {"wedges": depict.wedges(rd, [[x, y] for x, y in params.layout2d], explicit_h=params.explicitH)}
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +292,7 @@ def report_export(params: ReportExportParams, ctx: JobContext) -> dict[str, Any]
     """Render a repair report as Markdown or PDF (base64)."""
     from .chem import report
 
-    return report.export(params.report, params.format, params.locale)
+    return report.export(params.report, params.format, params.locale, params.strings)
 
 
 @method("ai.query", AiQueryParams, kind="ai")

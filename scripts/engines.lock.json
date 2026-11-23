@@ -34,12 +34,30 @@
     "tag": "b12650",
     "license": "MIT",
     "repo": "https://github.com/ggml-org/llama.cpp",
-    "cmake_common": ["-DCMAKE_BUILD_TYPE=Release", "-DLLAMA_CURL=OFF", "-DLLAMA_BUILD_TESTS=OFF", "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_SERVER=ON", "-DGGML_BACKEND_DL=ON", "-DGGML_CPU_ALL_VARIANTS=ON", "-DGGML_NATIVE=OFF", "-DBUILD_SHARED_LIBS=ON"],
+    "cmake_common": [
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DLLAMA_CURL=OFF",
+      "-DLLAMA_BUILD_TESTS=OFF",
+      "-DLLAMA_BUILD_EXAMPLES=OFF",
+      "-DLLAMA_BUILD_SERVER=ON",
+      "-DGGML_BACKEND_DL=ON",
+      "-DGGML_CPU_ALL_VARIANTS=ON",
+      "-DGGML_NATIVE=OFF",
+      "-DBUILD_SHARED_LIBS=ON"
+    ],
     "cmake_gpu": {
-      "linux-x64": ["-DGGML_VULKAN=ON"],
-      "windows-x64": ["-DGGML_VULKAN=ON"],
-      "macos-arm64": ["-DGGML_METAL=ON"],
-      "macos-x64": ["-DGGML_METAL=OFF"]
+      "linux-x64": [
+        "-DGGML_VULKAN=ON"
+      ],
+      "windows-x64": [
+        "-DGGML_VULKAN=ON"
+      ],
+      "macos-arm64": [
+        "-DGGML_METAL=ON"
+      ],
+      "macos-x64": [
+        "-DGGML_METAL=OFF"
+      ]
     }
   },
   "model": {
@@ -51,5 +69,18 @@
     "file": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
     "size": 2497281120,
     "sha256": "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597"
+  },
+  "fonts": {
+    "name": "IBM Plex Sans Thai",
+    "version": "1.1.0",
+    "license": "OFL-1.1",
+    "homepage": "https://github.com/IBM/plex",
+    "tarball": "https://registry.npmjs.org/@ibm/plex-sans-thai/-/plex-sans-thai-1.1.0.tgz",
+    "sha256": "9ddc70a54f7992646989fbc981f0bfeca32b3adceaa9bdf425ece7f0fbfd6565",
+    "files": {
+      "IBMPlexSansThai-Regular.ttf": "package/fonts/complete/woff/IBMPlexSansThai-Regular.woff",
+      "IBMPlexSansThai-SemiBold.ttf": "package/fonts/complete/woff/IBMPlexSansThai-SemiBold.woff"
+    },
+    "licenseFile": "package/LICENSE.txt"
   }
 }

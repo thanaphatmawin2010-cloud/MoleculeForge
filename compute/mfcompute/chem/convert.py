@@ -39,7 +39,7 @@ EMBED_SEED = 0x5EED
 def element_number(symbol: str) -> int:
     try:
         z = int(PT.GetAtomicNumber(symbol))
-    except Exception as exc:  # noqa: BLE001 - RDKit raises a bare RuntimeError
+    except Exception as exc:
         raise RpcError(CHEMISTRY_ERROR, f"Unknown element symbol '{symbol}'", {"code": "UNKNOWN_ELEMENT", "element": symbol}) from exc
     if z < 1 or z > 118:
         raise RpcError(CHEMISTRY_ERROR, f"Unknown element symbol '{symbol}'", {"code": "UNKNOWN_ELEMENT", "element": symbol})
@@ -103,7 +103,7 @@ def to_rdkit(molecule: Molecule, *, sanitize: bool = True) -> Chem.Mol:
     if sanitize:
         try:
             Chem.SanitizeMol(mol)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise RpcError(CHEMISTRY_ERROR, f"Structure is not chemically valid: {exc}", {"code": "SANITIZE_FAILED"}) from exc
         if three_d:
             Chem.AssignStereochemistryFrom3D(mol)
@@ -199,18 +199,18 @@ def annotate(molecule: Molecule, mol: Chem.Mol | None = None) -> Molecule:
         return molecule
     try:
         formula = rdMolDescriptors.CalcMolFormula(rd)
-    except Exception:  # noqa: BLE001
+    except Exception:
         formula = ""
     smiles = inchi = inchikey = ""
     try:
         heavy = Chem.RemoveHs(rd, sanitize=True)
         smiles = Chem.MolToSmiles(heavy)
-    except Exception:  # noqa: BLE001
+    except Exception:
         smiles = ""
     try:
         inchi = Chem.MolToInchi(rd, options="-w") or ""
         inchikey = Chem.InchiToInchiKey(inchi) if inchi else ""
-    except Exception:  # noqa: BLE001
+    except Exception:
         inchi = inchikey = ""
     meta = molecule.meta.model_copy(update={"smiles": smiles, "inchi": inchi, "inchikey": inchikey or ""})
     return molecule.model_copy(update={"formula": formula, "meta": meta})
@@ -244,13 +244,33 @@ def embed_3d(mol: Chem.Mol, *, seed: int = EMBED_SEED, keep_existing: bool = Fal
 # ---------------------------------------------------------------------------
 
 
+def stereo_origin(mol: Chem.Mol) -> str:
+    """Classify the source's stereo before any embedding (see ``MoleculeMeta.stereo``).
+
+    Potential centres are found with RDKit's newer perception, which also sees ring stereo
+    (1,4-disubstituted cyclohexanes); it can over-report cage bridgeheads, which only makes the
+    result more cautious ("partial" hides wedges that would not be drawn anyway).
+    """
+    if mol.GetNumConformers() and mol.GetConformer().Is3D():
+        return "coordinates"
+    try:
+        centres = Chem.FindMolChiralCenters(mol, includeUnassigned=True, useLegacyImplementation=False)
+    except Exception:
+        return ""
+    if not centres:
+        return "none"
+    return "partial" if any(label == "?" for _, label in centres) else "defined"
+
+
 def _finish(mol: Chem.Mol, name: str, embed3d: bool) -> Molecule:
+    origin = stereo_origin(mol)
     if mol.GetNumConformers() == 0 or not mol.GetConformer().Is3D():
         if embed3d:
             mol = embed_3d(mol)
         elif mol.GetNumConformers() == 0:
             AllChem.Compute2DCoords(mol)
-    return from_rdkit(mol, name=name)
+    molecule = from_rdkit(mol, name=name)
+    return molecule.model_copy(update={"meta": molecule.meta.model_copy(update={"stereo": origin})})
 
 
 def _sanitized(mol: Chem.Mol | None, what: str) -> Chem.Mol:
@@ -258,7 +278,7 @@ def _sanitized(mol: Chem.Mol | None, what: str) -> Chem.Mol:
         raise RpcError(CHEMISTRY_ERROR, f"Could not parse {what}", {"code": "PARSE_FAILED", "format": what})
     try:
         Chem.SanitizeMol(mol)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise RpcError(CHEMISTRY_ERROR, f"{what} record is not chemically valid: {exc}", {"code": "SANITIZE_FAILED"}) from exc
     if mol.GetNumConformers() and mol.GetConformer().Is3D():
         Chem.AssignStereochemistryFrom3D(mol)
@@ -300,7 +320,7 @@ def parse(fmt: str, data: str, *, charge: int = 0, embed3d: bool = True, name: s
         title = lines[1].strip() if len(lines) > 1 else ""
         try:
             rdDetermineBonds.DetermineBonds(mol, charge=charge)
-        except Exception:  # noqa: BLE001 - fall back to connectivity only (metals, unusual charges)
+        except Exception:
             mol = Chem.MolFromXYZBlock(text if text.endswith("\n") else text + "\n")
             rdDetermineBonds.DetermineConnectivity(mol)
         out.append(from_rdkit(_sanitized(mol, "XYZ"), name=title or name))

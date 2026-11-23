@@ -6,6 +6,7 @@ schema in ``ui/src/ipc/schema.ts``; both ends validate every message.
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -54,6 +55,11 @@ class MoleculeMeta(Strict):
     category: str = ""
     source: Literal["prebuilt", "user"] = "user"
     created: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds"))
+    #: Where the 3D structure's stereo came from, so the editor only shows stereo the source stated:
+    #: "coordinates" (a real 3D source), "defined" (2D/SMILES/InChI with every stereocentre given),
+    #: "partial" (some centres left open; embedding chose them arbitrarily), "none" (no stereocentres),
+    #: "" (unknown, e.g. drawn or edited in the app).
+    stereo: Literal["coordinates", "defined", "partial", "none", ""] = ""
 
 
 class Molecule(Strict):
@@ -132,6 +138,21 @@ class RepairParams(Strict):
     jobId: str | None = None
 
 
+class WedgesParams(Strict):
+    molecule: Molecule
+    layout2d: list[tuple[float, float]] = Field(max_length=100_000)
+    explicitH: bool = False
+    jobId: str | None = None
+
+    @model_validator(mode="after")
+    def _one_point_per_atom(self) -> WedgesParams:
+        if len(self.layout2d) != len(self.molecule.atoms):
+            raise ValueError("layout2d must have one (x, y) pair per atom")
+        if not all(math.isfinite(x) and math.isfinite(y) for x, y in self.layout2d):
+            raise ValueError("layout2d contains non-finite coordinates")
+        return self
+
+
 class ConvertParams(Strict):
     source: Literal["molecule", "sdf", "mol", "smiles", "inchi", "xyz", "pdb"]
     target: Literal["molecule", "sdf", "mol", "smiles", "inchi", "xyz", "pdb"]
@@ -149,6 +170,13 @@ class MinimizeParams(Strict):
     method: Literal["auto", "MMFF94", "MMFF94s", "UFF", "GFN-FF", "GFN2-xTB"] = "auto"
     maxSteps: int = Field(default=2000, ge=1, le=100_000)
     streamFrames: bool = True
+    jobId: str | None = None
+
+
+class RelaxParams(Strict):
+    molecule: Molecule
+    maxSteps: int = Field(default=300, ge=1, le=5000)
+    addHydrogens: bool = False
     jobId: str | None = None
 
 
@@ -202,9 +230,21 @@ class LibraryListParams(Strict):
 class LibrarySaveParams(Strict):
     molecule: Molecule
     layout2d: list[list[float]] | None = None
+    #: Stereo wedges as displayed ({"bond", "kind": "wedge"|"hash", "from"}); only sent when the stereo is known.
+    wedges: list[dict[str, int | str]] = Field(default_factory=list, max_length=2000)
     tags: list[str] = Field(default_factory=list)
     favorite: bool = False
     overwrite: bool = False
+
+    @model_validator(mode="after")
+    def _valid_wedges(self) -> LibrarySaveParams:
+        n_bonds, n_atoms = len(self.molecule.bonds), len(self.molecule.atoms)
+        for w in self.wedges:
+            bond, kind, start = w.get("bond"), w.get("kind"), w.get("from")
+            if not (isinstance(bond, int) and 0 <= bond < n_bonds and kind in ("wedge", "hash")
+                    and isinstance(start, int) and 0 <= start < n_atoms):
+                raise ValueError("invalid wedge entry")
+        return self
 
 
 class LibraryIdParams(Strict):
@@ -229,7 +269,18 @@ class LibraryExportParams(Strict):
 class ReportExportParams(Strict):
     report: dict[str, Any]
     format: Literal["markdown", "pdf"]
-    locale: str = "en"
+    locale: str = Field(default="en", max_length=16)
+    #: Localised labels from the UI: "<label>": text, plus "fixLines"/"issueLines" (lists) and "stageNames" (map).
+    strings: dict[str, str | list[str] | dict[str, str]] = Field(default_factory=dict, max_length=80)
+
+    @field_validator("strings")
+    @classmethod
+    def _bounded_strings(cls, value: dict[str, Any]) -> dict[str, Any]:
+        for key, item in value.items():
+            size = len(item) if isinstance(item, (list, dict)) else 1
+            if len(key) > 64 or size > 2000:
+                raise ValueError(f"strings[{key[:64]}] is too large")
+        return value
 
 
 class AiQueryParams(Strict):

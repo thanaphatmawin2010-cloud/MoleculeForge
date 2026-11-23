@@ -10,6 +10,7 @@ Usage::
     python3 scripts/fetch_engines.py                # all components
     python3 scripts/fetch_engines.py --only model   # one component
     python3 scripts/fetch_engines.py --only xtb mopac vina llama
+    python3 scripts/fetch_engines.py --only fonts   # report fonts (WOFF -> TTF)
 
 Only the Python standard library is used so this runs before any virtualenv
 exists (CI bootstrap, fresh clones).
@@ -24,12 +25,14 @@ import os
 import platform
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tarfile
 import tempfile
 import time
 import urllib.request
+import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -88,7 +91,7 @@ def download(url: str, dest: Path, expected_size: int | None = None, attempts: i
                 raise OSError(f"size mismatch {part.stat().st_size} != {expected_size}")
             part.replace(dest)
             return
-        except Exception as exc:  # noqa: BLE001 - retry any transport failure
+        except Exception as exc:
             wait = 2 ** attempt
             log(f"download attempt {attempt} failed ({exc}); retrying in {wait}s")
             time.sleep(wait)
@@ -109,6 +112,67 @@ def fetch_model() -> None:
         dest.unlink()
         raise SystemExit(f"model sha256 mismatch: {actual}")
     log("model verified")
+
+
+def woff_to_ttf(woff: bytes) -> bytes:
+    """Convert a WOFF 1.0 font to a plain sfnt (TTF) using only the standard library."""
+    signature, flavor, _length, num_tables = struct.unpack(">4sIIH", woff[:14])
+    if signature != b"wOFF":
+        raise ValueError("not a WOFF 1.0 font")
+    tables = []
+    for i in range(num_tables):
+        tag, offset, comp_len, orig_len, checksum = struct.unpack(">4sIIII", woff[44 + 20 * i: 64 + 20 * i])
+        raw = woff[offset: offset + comp_len]
+        data = zlib.decompress(raw) if comp_len < orig_len else raw
+        if len(data) != orig_len:
+            raise ValueError(f"table {tag!r} has the wrong length")
+        tables.append((tag, checksum, data))
+    tables.sort(key=lambda t: t[0])
+    entry_selector = max(0, num_tables.bit_length() - 1)
+    search_range = (1 << entry_selector) * 16
+    header = struct.pack(">IHHHH", flavor, num_tables, search_range, entry_selector, num_tables * 16 - search_range)
+    offset = 12 + 16 * num_tables
+    directory, body, head_offset = b"", b"", None
+    for tag, checksum, data in tables:
+        if tag == b"head":
+            head_offset = offset + 8  # checkSumAdjustment
+        directory += struct.pack(">4sIII", tag, checksum, offset, len(data))
+        padded = data + b"\0" * (-len(data) % 4)
+        body += padded
+        offset += len(padded)
+    font = bytearray(header + directory + body)
+    if head_offset is not None:
+        font[head_offset:head_offset + 4] = b"\0\0\0\0"
+        total = sum(struct.unpack(f">{len(font) // 4}I", bytes(font))) & 0xFFFFFFFF
+        font[head_offset:head_offset + 4] = struct.pack(">I", (0xB1B0AFBA - total) & 0xFFFFFFFF)
+    return bytes(font)
+
+
+def fetch_fonts() -> None:
+    """PDF report fonts: IBM Plex Sans Thai covers Latin and Thai in one face (OFL-1.1)."""
+    spec = LOCK["fonts"]
+    dest = ROOT / "data" / "fonts"
+    if all((dest / name).exists() for name in spec["files"]) and (dest / "OFL.txt").exists():
+        log("fonts already present")
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        tarball = Path(tmp) / "fonts.tgz"
+        download(spec["tarball"], tarball)
+        actual = sha256_of(tarball)
+        if actual != spec["sha256"]:
+            raise SystemExit(f"font package sha256 mismatch: {actual}")
+        dest.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(tarball) as tar:
+            for ttf_name, member in spec["files"].items():
+                extracted = tar.extractfile(member)
+                if extracted is None:
+                    raise SystemExit(f"{member} missing from font package")
+                (dest / ttf_name).write_bytes(woff_to_ttf(extracted.read()))
+            license_file = tar.extractfile(spec["licenseFile"])
+            if license_file is None:
+                raise SystemExit("font licence missing from package")
+            (dest / "OFL.txt").write_bytes(license_file.read())
+    log(f"fonts written to {dest.relative_to(ROOT)}")
 
 
 def micromamba(plat: str) -> Path:
@@ -224,12 +288,12 @@ def write_manifest(plat: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--only", nargs="*", choices=["model", "xtb", "mopac", "vina", "llama"], default=None)
+    parser.add_argument("--only", nargs="*", choices=["model", "xtb", "mopac", "vina", "llama", "fonts"], default=None)
     parser.add_argument("--platform", default=None, help="override platform key (e.g. linux-x64)")
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 2)
     opts = parser.parse_args()
     plat = opts.platform or platform_key()
-    wanted = set(opts.only or ["model", "xtb", "mopac", "vina", "llama"])
+    wanted = set(opts.only or ["model", "xtb", "mopac", "vina", "llama", "fonts"])
     for conda_engine in ("xtb", "mopac"):
         if conda_engine in wanted:
             fetch_conda_engine(plat, conda_engine)
@@ -239,6 +303,8 @@ def main() -> None:
         fetch_llama(plat, opts.jobs)
     if "model" in wanted:
         fetch_model()
+    if "fonts" in wanted:
+        fetch_fonts()
     write_manifest(plat)
     log("done")
 

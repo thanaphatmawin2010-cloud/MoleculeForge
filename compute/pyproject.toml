@@ -17,6 +17,7 @@ dependencies = [
     "reportlab>=4.2,<6",
     "meeko==0.8.0",
     "gemmi>=0.7,<0.8",
+    "uharfbuzz>=0.50",
 ]
 
 [dependency-groups]

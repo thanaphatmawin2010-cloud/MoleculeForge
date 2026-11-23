@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import threading
 import time
@@ -24,6 +25,12 @@ class JobContext:
         self._lock = threading.Lock()
         self._last_emit = 0.0
         self.started = time.perf_counter()
+
+    def derive(self, emit: Emitter | None) -> JobContext:
+        """A context with a different emitter that shares this job's id and cancellation flag."""
+        child = JobContext(self.job_id, emit)
+        child._cancel = self._cancel
+        return child
 
     # -- cancellation -------------------------------------------------
     def cancel(self) -> None:
@@ -96,11 +103,9 @@ def terminate_process(proc: subprocess.Popen[Any]) -> None:
     try:
         proc.terminate()
         proc.wait(timeout=3)
-    except Exception:  # noqa: BLE001 - escalate to kill on any failure
-        try:
+    except Exception:  # escalate to kill on any failure
+        with contextlib.suppress(Exception):
             proc.kill()
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def run_process(

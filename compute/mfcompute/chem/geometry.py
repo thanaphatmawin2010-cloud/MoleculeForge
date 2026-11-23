@@ -12,6 +12,7 @@ final-stage method is run from the current coordinates; if the structure moves l
 
 from __future__ import annotations
 
+import contextlib
 import math
 import time
 from typing import Any
@@ -22,6 +23,7 @@ from rdkit.Chem import AllChem
 
 from ..jobs import JobContext
 from ..models import Molecule
+from ..rpc import RpcError
 from ..sim import forcefield, xtb
 from . import convert, reference, validate
 
@@ -298,10 +300,8 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
     rd = convert.to_rdkit(fixed)
     before_measure: dict[str, list[dict[str, Any]]] = {"bonds": [], "angles": [], "dihedrals": []}
     if molecule.atoms and not any(i.code in ("SELF_BOND", "DUPLICATE_BOND", "UNKNOWN_ELEMENT") for i in initial_issues):
-        try:
+        with contextlib.suppress(Exception):  # an unmeasurable input simply yields no "before" values
             before_measure = measure(convert.to_rdkit(molecule, sanitize=False))
-        except Exception:  # noqa: BLE001 - an unmeasurable input simply yields no "before" values
-            pass
     usable = _usable_geometry(fixed)
     n_before = rd.GetNumAtoms()
     rd_h = Chem.AddHs(rd, addCoords=rd.GetConformer().Is3D() if rd.GetNumConformers() else False)
@@ -309,49 +309,81 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
     methods.append({"stage": "perceive", "method": "RDKit hybridisation + VSEPR (Gillespie) domain counting", "details": ""})
     chemically_clean = not any(i.severity == "error" for i in initial_issues)
 
-    ff_name = forcefield.choose_force_field(rd_h, force_field)
+    try:
+        ff_name: str | None = forcefield.choose_force_field(rd_h, force_field)
+    except RpcError:
+        ff_name = None  # e.g. octahedral S in SF6 or tetrahedral Os(VIII): no UFF atom type
     xtb_ok = xtb.available() and xtb.supports(rd_h)
-    use_xtb = xtb_ok and (refine == "gfn2-xtb" or (refine == "auto" and rd_h.GetNumAtoms() <= AUTO_XTB_MAX_ATOMS))
-    final_method = "GFN2-xTB" if use_xtb else ff_name
+    use_xtb = xtb_ok and (
+        refine == "gfn2-xtb" or ff_name is None or (refine == "auto" and rd_h.GetNumAtoms() <= AUTO_XTB_MAX_ATOMS)
+    )
+    if ff_name is None and not use_xtb:
+        return {
+            "status": "failed",
+            "reason": "No force field or tight-binding method in MoleculeForge covers every element in this structure.",
+            "issuesFound": initial_issues, "fixesApplied": fix["fixes"], "remainingIssues": [], "molecule": fixed,
+            "durationMs": int((time.perf_counter() - started) * 1000),
+        }
+    final_method = "GFN2-xTB" if use_xtb else str(ff_name)
     if refine == "gfn2-xtb" and final_method != "GFN2-xTB":
         methods.append({"stage": "refine", "method": "GFN2-xTB", "details": "skipped: engine unavailable or element outside H–Rn"})
+    if ff_name is None:
+        methods.append({"stage": "minimize", "method": "classical force field", "details": "skipped: no MMFF94/UFF atom types; GFN2-xTB used directly"})
 
     start_coords = rd_h.GetConformer().GetPositions().copy()
     embedded = False
-    if not (usable and not added):
-        if not usable or not rd_h.GetConformer().Is3D():
-            ctx.progress(15, "embed", "Generating 3D coordinates (ETKDGv3)", force=True)
-            rd_h = convert.embed_3d(rd_h, keep_existing=False)
-            embedded = True
-            added = list(range(n_before, rd_h.GetNumAtoms()))
-            methods.append({"stage": "embed", "method": "RDKit ETKDGv3 distance geometry", "details": f"random seed {convert.EMBED_SEED}"})
+    if not (usable and not added) and (not usable or not rd_h.GetConformer().Is3D()):
+        ctx.progress(15, "embed", "Generating 3D coordinates (ETKDGv3)", force=True)
+        rd_h = convert.embed_3d(rd_h, keep_existing=False)
+        embedded = True
+        added = list(range(n_before, rd_h.GetNumAtoms()))
+        methods.append({"stage": "embed", "method": "RDKit ETKDGv3 distance geometry", "details": f"random seed {convert.EMBED_SEED}"})
+    candidate_optimal = chemically_clean and usable and not added and not embedded
+    total_cycles = 0
     ff_result = None
-    if final_method != "GFN2-xTB" or embedded or added or not usable:
+    if ff_name is not None and (final_method != "GFN2-xTB" or embedded or added or not usable):
         ff_result = forcefield.minimize(rd_h, ff_name, ctx, max_steps=5000, stage="minimize", percent_from=25, percent_to=70)
         methods.append({"stage": "minimize", "method": ff_name, "details": f"{ff_result.iterations} steps, converged={ff_result.converged}"})
     xtb_result = None
-    if final_method == "GFN2-xTB":
-        xtb_result = xtb.run(rd_h, ctx, task="opt", gfn="2", opt_level="tight", percent_from=70, percent_to=95, stage="refine")
-        if xtb_result.coordinates:
-            conf = rd_h.GetConformer()
-            for idx, (x, y, z) in enumerate(xtb_result.coordinates):
-                conf.SetAtomPosition(idx, (x, y, z))
-        methods.append({"stage": "refine", "method": "GFN2-xTB (ANC optimiser, tight)", "details": f"{xtb_result.cycles} cycles"})
+    xtb_start_energy: float | None = None
+    if final_method == "GFN2-xTB" and rd_h.GetNumAtoms() > 1:
+        if candidate_optimal:
+            xtb_start_energy = xtb.run(rd_h, ctx, task="sp", gfn="2", percent_from=60, percent_to=70, stage="refine").energy_hartree
+        total_cycles = 0
+        for attempt in range(3):  # restart from the last geometry until the optimiser reports convergence
+            xtb_result = xtb.run(rd_h, ctx, task="opt", gfn="2", opt_level="tight", percent_from=70 + 8 * attempt,
+                                 percent_to=78 + 8 * attempt, stage="refine")
+            total_cycles += xtb_result.cycles
+            if xtb_result.coordinates:
+                conf = rd_h.GetConformer()
+                for idx, (x, y, z) in enumerate(xtb_result.coordinates):
+                    conf.SetAtomPosition(idx, (x, y, z))
+            if xtb_result.converged:
+                break
+        methods.append({"stage": "refine", "method": "GFN2-xTB (ANC optimiser, tight)",
+                        "details": f"{total_cycles} cycles, converged={xtb_result.converged}"})
 
     final_coords = rd_h.GetConformer().GetPositions()
     common = min(len(start_coords), len(final_coords))
     rmsd = kabsch_rmsd(np.asarray(start_coords[:common]), np.asarray(final_coords[:common])) if not embedded else None
-    energy_change = abs(ff_result.energy_final - ff_result.energy_initial) if ff_result else 0.0
-    already_optimal = (
-        chemically_clean and usable and not added and not embedded and rmsd is not None and rmsd < OPTIMAL_RMSD
-        and (ff_result is None or energy_change < OPTIMAL_DE or rmsd < OPTIMAL_RMSD / 4)
-    )
+    if xtb_result is not None and xtb_start_energy is not None and xtb_result.energy_hartree is not None:
+        energy_change = abs(xtb_start_energy - xtb_result.energy_hartree) * xtb.HARTREE_TO_KCAL
+    elif ff_result is not None:
+        energy_change = abs(ff_result.energy_final - ff_result.energy_initial)
+    else:
+        energy_change = 0.0
+    # "Already optimal" = nothing material changes: either the atoms barely move, or they drift along a
+    # flat coordinate (e.g. a free benzyl rotation) with a negligible energy change.
+    already_optimal = candidate_optimal and rmsd is not None and (rmsd < OPTIMAL_RMSD or energy_change < OPTIMAL_DE)
     if already_optimal:
         final_molecule = molecule
         rd_report = convert.to_rdkit(molecule)
     else:
         final_molecule = convert.from_rdkit(rd_h, mol_id=molecule.id, name=molecule.name, source=molecule.meta.source,
                                             props=molecule.props, category=molecule.meta.category)
+        # Re-embedding keeps the input's stereocentres; a connectivity fix may not, so it resets the origin.
+        kept = molecule.meta.stereo if not fix["fixes"] else ""
+        final_molecule = final_molecule.model_copy(update={"meta": final_molecule.meta.model_copy(update={"stereo": kept})})
         rd_report = rd_h
     ctx.progress(97, "report", "Writing repair report", force=True)
     after_measure = measure(rd_report)
@@ -364,7 +396,10 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
     if xtb_result is not None and xtb_result.energy_hartree is not None:
         residual = {"value": round(xtb_result.energy_hartree, 8), "unit": "Eh", "method": "GFN2-xTB total energy"}
     else:
-        residual = {"value": round(forcefield.energy(rd_report, ff_name), 6), "unit": "kcal/mol", "method": f"{ff_name} potential energy"}
+        if ff_name is not None:
+            residual = {"value": round(forcefield.energy(rd_report, ff_name), 6), "unit": "kcal/mol", "method": f"{ff_name} potential energy"}
+        else:
+            residual = {"value": None, "unit": "kcal/mol", "method": "not applicable (single atom or no energy model)"}
     report = {
         "status": "already-optimal" if already_optimal else "repaired",
         "molecule": final_molecule,
@@ -378,7 +413,7 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
         "methods": methods,
         "convergence": {
             "forceField": ff_result.as_dict() if ff_result else None,
-            "xtb": {"method": "GFN2-xTB", "converged": xtb_result.converged, "cycles": xtb_result.cycles,
+            "xtb": {"method": "GFN2-xTB", "converged": xtb_result.converged, "cycles": total_cycles,
                     "energy": xtb_result.energy_hartree, "unit": "Eh"} if xtb_result else None,
         },
         "residualEnergy": residual,
@@ -386,21 +421,65 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
                  "note": "Kabsch-aligned RMSD between input and output coordinates" if rmsd is not None else "new coordinates generated"},
         "geometryCheck": tables,
         "finalIssues": final_issues,
+        "atomMap": fix["atomMap"],
         "durationMs": int((time.perf_counter() - started) * 1000),
     }
     ctx.progress(100, "done", "Repair complete", force=True)
     return report
 
 
-def quick_relax(molecule: Molecule, ctx: JobContext, max_steps: int = 200) -> Molecule:
-    """Fast local relaxation used for live editing feedback (no embedding, no report)."""
+def _break_symmetry(mol: Chem.Mol, amplitude: float = 0.02) -> None:
+    """Nudge every atom by a tiny, reproducible amount (seeded).
+
+    Sketched input is often exactly planar or linear (H-O-H drawn at 180 degrees); there the
+    bending gradient vanishes by symmetry and a minimiser would stay on the saddle point.
+    """
+    if mol.GetNumConformers() == 0:
+        return
+    conf = mol.GetConformer()
+    pos = conf.GetPositions() + np.random.default_rng(convert.EMBED_SEED).normal(scale=amplitude, size=(mol.GetNumAtoms(), 3))
+    for i, p in enumerate(pos):
+        conf.SetAtomPosition(i, p.tolist())
+
+
+def quick_relax(molecule: Molecule, ctx: JobContext, max_steps: int = 300, add_hydrogens: bool = False) -> Molecule:
+    """Fast local relaxation for live editing feedback (no embedding, no report).
+
+    Implicit hydrogens are included in the force field so heavy-atom geometry is realistic, then
+    dropped again unless ``add_hydrogens`` is set, so the document's atom list never changes
+    underneath the editor. Frames are streamed for the original atoms only.
+    """
+    n_original = len(molecule.atoms)
     rd = convert.to_rdkit(molecule)
-    rd_h = Chem.AddHs(rd, addCoords=True) if rd.GetConformer().Is3D() else convert.embed_3d(rd)
+    has_coords = rd.GetNumConformers() > 0 and rd.GetConformer().Is3D()
+    rd_h = Chem.AddHs(rd, addCoords=True) if has_coords else convert.embed_3d(rd)
     try:
         ff = forcefield.choose_force_field(rd_h)
-    except Exception:  # noqa: BLE001 - leave coordinates untouched when no force field applies
+    except RpcError:
         return molecule
-    forcefield.minimize(rd_h, ff, ctx, max_steps=max_steps, stream=True, stage="relax")
+    _break_symmetry(rd_h)
+    stream_ctx = ctx
+    if not add_hydrogens:
+        def forward(method: str, params: dict[str, Any]) -> None:
+            data = params.get("data")
+            if method == "progress" and isinstance(data, dict) and isinstance(data.get("frame"), list):
+                params = {**params, "data": {**data, "frame": data["frame"][:n_original]}}
+            if ctx_emit is not None:
+                ctx_emit(method, params)
+
+        ctx_emit = ctx._emit
+        stream_ctx = ctx.derive(forward)
+    forcefield.minimize(rd_h, ff, stream_ctx, max_steps=max_steps, stream=True, stage="relax")
+    if not add_hydrogens:
+        rw = Chem.RWMol(rd_h)
+        for idx in sorted(range(n_original, rd_h.GetNumAtoms()), reverse=True):
+            rw.RemoveAtom(idx)
+        rd_out = rw.GetMol()
+        rd_out.UpdatePropertyCache(strict=False)
+        relaxed = rd_out.GetConformer().GetPositions()
+        atoms = [a.model_copy(update={"x": round(float(p[0]), 6), "y": round(float(p[1]), 6), "z": round(float(p[2]), 6)})
+                 for a, p in zip(molecule.atoms, relaxed, strict=True)]
+        return molecule.model_copy(update={"atoms": atoms})
     AllChem.AssignStereochemistryFrom3D(rd_h)
     return convert.from_rdkit(rd_h, mol_id=molecule.id, name=molecule.name, source=molecule.meta.source,
                               props=molecule.props, category=molecule.meta.category)

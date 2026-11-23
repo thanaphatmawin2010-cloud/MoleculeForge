@@ -1,0 +1,31 @@
+{
+  "code": {
+    "AROMATIC_INVALID": "The ring containing atoms {atomList} cannot be aromatic as drawn (no valid Kekulé structure).",
+    "ATOMS_OVERLAP": "Atoms {a} and {b} occupy the same position ({distance} Å apart).",
+    "BOND_TOO_LONG": "Bond {a}–{b} is {length} Å; expected about {expected} Å.",
+    "BOND_TOO_SHORT": "Bond {a}–{b} is {length} Å; expected about {expected} Å.",
+    "CHARGE_UNUSUAL": "{element} atom {atom} has an unusual formal charge of {charge}.",
+    "CLASH": "Non-bonded atoms {a} and {b} are only {distance} Å apart (minimum {limit} Å).",
+    "DUPLICATE_BOND": "Atoms {a} and {b} are bonded twice.",
+    "EMPTY": "The canvas is empty.",
+    "FRAGMENTS": "The structure has {count} disconnected fragments.",
+    "HYPERVALENT": "{element} atom {atom} uses an expanded valence ({valence}); this is allowed for period-3+ elements.",
+    "ISOTOPE_UNKNOWN": "Mass number {isotope} is not a known isotope of {element}.",
+    "RADICAL": "{element} atom {atom} carries {radicals, plural, one {# unpaired electron} other {# unpaired electrons}}.",
+    "SELF_BOND": "Atom {atom} is bonded to itself.",
+    "UNDERSATURATED": "{element} atom {atom} has an unpaired electron (radical); hydrogen count is too low.",
+    "UNKNOWN_ELEMENT": "“{element}” is not an element symbol.",
+    "VALENCE_EXCEEDED": "{element} atom {atom} has {valence} bonds; at most {allowed} are allowed with charge {charge}.",
+    "VALID": "Bond connected correctly."
+  },
+  "fix": {
+    "clearIsotope": "Cleared the invalid isotope on atom {atom}.",
+    "kekulize": "Assigned a valid Kekulé structure to atoms {atoms}.",
+    "moveAtom": "Moved atom {atom} to a bond length of {length} Å.",
+    "removeAtom": "Removed hydrogen atom {atom} to free a valence.",
+    "removeBond": "Removed bond {a}–{b}.",
+    "setBondOrder": "Changed bond {a}–{b} from {from, select, single {single} double {double} triple {triple} aromatic {aromatic} other {{from}}} to {to, select, single {single} double {double} triple {triple} aromatic {aromatic} other {{to}}}.",
+    "setCharge": "Set the formal charge of {element} atom {atom} to {charge, number, ::sign-always}.",
+    "setHCount": "Set the hydrogen count of {element} atom {atom} to {hCount}."
+  }
+}

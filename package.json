@@ -1,0 +1,23 @@
+{
+  "name": "moleculeforge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "MoleculeForge: offline molecular design, validation and simulation suite",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm --dir ui dev",
+    "build:ui": "pnpm --dir ui build",
+    "test:ui": "pnpm --dir ui test",
+    "test:e2e": "pnpm --dir ui e2e",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

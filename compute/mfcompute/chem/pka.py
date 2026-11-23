@@ -40,6 +40,32 @@ RULES: list[tuple[str, str, str, float, str]] = [
     ("aniline", "base", "c[NX3;H2,H1;!$(N-C=[O,N,S])]", 4.6, "aniline"),
 ]
 
+# Stable identifiers for localisation (ui/src/locales/<lang>/common.json "pka.<id>").
+GROUP_IDS: dict[str, str] = {
+    "sulfonic acid": "sulfonicAcid",
+    "phosphate/phosphonic acid": "phosphateAcid",
+    "aromatic carboxylic acid": "aromaticCarboxylicAcid",
+    "carboxylic acid": "carboxylicAcid",
+    "tetrazole": "tetrazole",
+    "thiophenol": "thiophenol",
+    "1,3-dicarbonyl C–H": "dicarbonylCH",
+    "imide": "imide",
+    "phenol": "phenol",
+    "sulfonamide": "sulfonamide",
+    "aliphatic thiol": "aliphaticThiol",
+    "aliphatic alcohol": "aliphaticAlcohol",
+    "water": "water",
+    "guanidine": "guanidine",
+    "amidine": "amidine",
+    "secondary aliphatic amine": "secondaryAmine",
+    "primary aliphatic amine": "primaryAmine",
+    "tertiary aliphatic amine": "tertiaryAmine",
+    "ammonia": "ammonia",
+    "imidazole": "imidazole",
+    "pyridine": "pyridine",
+    "aniline": "aniline",
+}
+
 _COMPILED = [(name, kind, Chem.MolFromSmarts(smarts), value, parent) for name, kind, smarts, value, parent in RULES]
 
 
@@ -57,7 +83,8 @@ def estimate(mol: Chem.Mol) -> list[dict[str, Any]]:
                 continue
             claimed.add(anchor)
             sites.append({
-                "group": name, "kind": kind, "pKa": value, "uncertainty": 1.5, "atoms": list(heavy), "site": anchor,
+                "group": name, "groupId": GROUP_IDS[name], "kind": kind, "pKa": value, "uncertainty": 1.5,
+                "atoms": list(heavy), "site": anchor,
                 "parentCompound": parent,
             })
     return sorted(sites, key=lambda s: s["pKa"])

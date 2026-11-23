@@ -43,8 +43,17 @@ FIX_DESCRIPTIONS: dict[str, str] = {
 }
 
 
+DISPLAY_INDEX_KEYS = ("atom", "a", "b")
+
+
+def display_params(params: dict[str, Any]) -> dict[str, Any]:
+    """Atom numbers shown to people are 1-based, matching the editor labels."""
+    return {k: (v + 1 if k in DISPLAY_INDEX_KEYS and isinstance(v, int) else v) for k, v in params.items()}
+
+
 def make_issue(code: str, *, atoms: list[int] | None = None, bonds: list[int] | None = None, **params: Any) -> Issue:
     severity, template = CODES[code]
+    params = display_params(params)
     try:
         message = template.format(**params)
     except (KeyError, IndexError, ValueError):
@@ -54,6 +63,7 @@ def make_issue(code: str, *, atoms: list[int] | None = None, bonds: list[int] | 
 
 def describe_fix(op: str, **params: Any) -> str:
     template = FIX_DESCRIPTIONS.get(op, op)
+    params = display_params(params)
     try:
         return template.format(**params)
     except (KeyError, IndexError, ValueError):

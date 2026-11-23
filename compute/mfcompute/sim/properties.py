@@ -14,6 +14,7 @@ Stages (each gated by element coverage and system size, all local):
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import sqlite3
@@ -73,11 +74,9 @@ def _surface_and_shape(mol: Chem.Mol) -> dict[str, dict[str, Any]]:
     polar = sum(float(a.GetProp("SASA")) for a in mol.GetAtoms() if a.HasProp("SASA") and a.GetSymbol() in ("N", "O", "S", "P"))
     props["sasa"] = _pv(round(float(sasa), 2), "Å²", "Lee–Richards (FreeSASA), Alvarez/Bondi vdW radii, 1.4 Å probe")
     props["polarSasa"] = _pv(round(polar, 2), "Å²", "Lee–Richards SASA of N, O, S, P atoms")
-    try:
+    with contextlib.suppress(Exception):  # volume grid can fail for exotic elements
         props["molecularVolume"] = _pv(round(float(AllChem.ComputeMolVolume(mol, gridSpacing=0.2)), 2), "Å³",
                                        "van der Waals volume, 0.2 Å grid (RDKit)")
-    except Exception:  # noqa: BLE001
-        pass
     if mol.GetNumAtoms() > 1:
         props["radiusOfGyration"] = _pv(round(float(rdMolDescriptors.CalcRadiusOfGyration(mol)), 4), "Å", "mass-weighted (RDKit)")
         rot = thermo.rotational_constants(mol)

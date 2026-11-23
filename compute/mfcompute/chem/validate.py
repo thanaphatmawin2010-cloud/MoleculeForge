@@ -29,7 +29,7 @@ from ..data import elements
 from ..models import Atom, Bond, Issue, Molecule
 from ..rpc import CHEMISTRY_ERROR, RpcError
 from . import convert
-from .issues import describe_fix, make_issue
+from .issues import describe_fix, display_params, make_issue
 
 PT = Chem.GetPeriodicTable()
 
@@ -74,7 +74,7 @@ def graph_issues(molecule: Molecule) -> list[Issue]:
     for atom in molecule.atoms:
         try:
             z = PT.GetAtomicNumber(atom.el)
-        except Exception:  # noqa: BLE001
+        except Exception:
             issues.append(make_issue("UNKNOWN_ELEMENT", atoms=[atom.i], element=atom.el))
             continue
         if atom.isotope and PT.GetMassForIsotope(z, atom.isotope) <= 0.0:
@@ -124,7 +124,7 @@ def chemistry_issues(molecule: Molecule) -> tuple[list[Issue], Chem.Mol | None]:
         if kind == "AtomValenceException":
             idx = problem.GetAtomIdx()
             atom = molecule.atoms[idx]
-            explicit = int(round(valence_sum[idx])) + (atom.hCount or 0)
+            explicit = round(valence_sum[idx]) + (atom.hCount or 0)
             allowed = _max_valence(atom.el, atom.charge)
             issues.append(
                 make_issue(
@@ -143,12 +143,12 @@ def chemistry_issues(molecule: Molecule) -> tuple[list[Issue], Chem.Mol | None]:
             bonds = sorted(
                 index[(min(a, b), max(a, b))] for a, b in itertools.combinations(atoms, 2) if (min(a, b), max(a, b)) in index
             )
-            issues.append(make_issue("AROMATIC_INVALID", atoms=atoms, bonds=bonds, atomList=", ".join(str(a) for a in atoms)))
+            issues.append(make_issue("AROMATIC_INVALID", atoms=atoms, bonds=bonds, atomList=", ".join(str(a + 1) for a in atoms)))
     if issues:
         return issues, None
     try:
         Chem.SanitizeMol(mol)
-    except Exception as exc:  # noqa: BLE001 - unexpected sanitize failure without a detected problem
+    except Exception as exc:
         raise RpcError(CHEMISTRY_ERROR, f"Structure could not be sanitized: {exc}", {"code": "SANITIZE_FAILED"}) from exc
     for rd_atom in mol.GetAtoms():
         idx = rd_atom.GetIdx()
@@ -161,9 +161,9 @@ def chemistry_issues(molecule: Molecule) -> tuple[list[Issue], Chem.Mol | None]:
                 issues.append(make_issue("RADICAL", atoms=[idx], element=atom.el, atom=idx, radicals=radicals))
         default = PT.GetDefaultValence(rd_atom.GetAtomicNum())
         total = rd_atom.GetTotalValence()
-        if default > 0 and rd_atom.GetFormalCharge() == 0 and total > default and PT.GetNOuterElecs(rd_atom.GetAtomicNum()) >= 5:
-            if rd_atom.GetAtomicNum() > 10:
-                issues.append(make_issue("HYPERVALENT", atoms=[idx], element=atom.el, atom=idx, valence=total))
+        if (default > 0 and rd_atom.GetFormalCharge() == 0 and total > default
+                and PT.GetNOuterElecs(rd_atom.GetAtomicNum()) >= 5 and rd_atom.GetAtomicNum() > 10):
+            issues.append(make_issue("HYPERVALENT", atoms=[idx], element=atom.el, atom=idx, valence=total))
         if abs(atom.charge) >= 3 and rd_atom.GetAtomicNum() <= 54 and not _is_metal(atom.el):
             issues.append(make_issue("CHARGE_UNUSUAL", atoms=[idx], element=atom.el, atom=idx, charge=atom.charge))
     fragments = len(Chem.GetMolFrags(mol)) if mol.GetNumAtoms() else 0
@@ -293,8 +293,16 @@ def _atom_errors(m: Molecule, idx: int) -> bool:
     return any(i.severity == "error" and idx in i.atoms for i in issues)
 
 
-def _record(state: FixState, reason: str, op: dict[str, Any], before: dict[str, Any], after_molecule: Molecule,
-            after_ref: tuple[str, int] | None, **describe: Any) -> None:
+def _record(state: FixState, reason: Issue | str, op: dict[str, Any], before: dict[str, Any], after_molecule: Molecule,
+            after_ref: tuple[str, int] | None, reason_params: dict[str, Any] | None = None, **describe: Any) -> None:
+    """Log one applied fix with everything needed to explain it in any language.
+
+    ``reason``/``reasonParams`` identify the issue that triggered the fix (localised through
+    ``issues:code.<CODE>``); ``fix.params`` fills ``issues:fix.<op>``. Atom numbers are 1-based.
+    """
+    code = reason.code if isinstance(reason, Issue) else reason
+    if reason_params is None:
+        reason_params = dict(reason.params) if isinstance(reason, Issue) else {}
     after: dict[str, Any] = {}
     if after_ref is not None:
         kind, ref = after_ref
@@ -305,7 +313,8 @@ def _record(state: FixState, reason: str, op: dict[str, Any], before: dict[str, 
         elif kind == "removed":
             after = {"removed": True}
     state.ops.append(op)
-    state.log.append({"before": before, "reason": reason, "fix": {**op, "description": describe_fix(op["op"], **describe)}, "after": after})
+    state.log.append({"before": before, "reason": code, "reasonParams": reason_params, "after": after,
+                      "fix": {**op, "description": describe_fix(op["op"], **describe), "params": display_params(describe)}})
 
 
 def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
@@ -333,7 +342,7 @@ def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
             if not _atom_errors(candidate, new_idx):
                 state.molecule = candidate
                 state.atom_map = [mapping[i] if i >= 0 else -1 for i in state.atom_map]
-                _record(state, issue.code, {"op": "removeAtom", "atom": h_idx}, before, candidate, ("atom", new_idx), atom=h_idx)
+                _record(state, issue, {"op": "removeAtom", "atom": h_idx}, before, candidate, ("atom", new_idx), atom=h_idx)
                 return True
             break
 
@@ -342,7 +351,7 @@ def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
         candidate = _set_atom(m, idx, hCount=atom.hCount - 1)
         if not _atom_errors(candidate, idx):
             state.molecule = candidate
-            _record(state, issue.code, {"op": "setHCount", "atom": idx, "hCount": atom.hCount - 1}, before, candidate,
+            _record(state, issue, {"op": "setHCount", "atom": idx, "hCount": atom.hCount - 1}, before, candidate,
                     ("atom", idx), element=atom.el, atom=idx, hCount=atom.hCount - 1)
             return True
 
@@ -355,7 +364,7 @@ def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
             candidate = _set_bond_order(m, bond_idx, order)
             if not _atom_errors(candidate, idx):
                 state.molecule = candidate
-                _record(state, issue.code, {"op": "setBondOrder", "bond": bond_idx, "order": order}, _snapshot_bond(m, bond_idx),
+                _record(state, issue, {"op": "setBondOrder", "bond": bond_idx, "order": order}, _snapshot_bond(m, bond_idx),
                         candidate, ("bond", bond_idx), a=bond.a, b=bond.b, **{"from": bond.order, "to": order})
                 return True
 
@@ -366,7 +375,7 @@ def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
         candidate = _set_atom(m, idx, charge=charge)
         if not _atom_errors(candidate, idx):
             state.molecule = candidate
-            _record(state, issue.code, {"op": "setCharge", "atom": idx, "charge": charge}, before, candidate, ("atom", idx),
+            _record(state, issue, {"op": "setCharge", "atom": idx, "charge": charge}, before, candidate, ("atom", idx),
                     element=atom.el, atom=idx, charge=charge)
             return True
 
@@ -380,7 +389,7 @@ def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
         candidate = _set_bond_order(m, bond_idx, order)
         if _error_count(candidate) < _error_count(m):
             state.molecule = candidate
-            _record(state, issue.code, {"op": "setBondOrder", "bond": bond_idx, "order": order}, _snapshot_bond(m, bond_idx),
+            _record(state, issue, {"op": "setBondOrder", "bond": bond_idx, "order": order}, _snapshot_bond(m, bond_idx),
                     candidate, ("bond", bond_idx), a=bond.a, b=bond.b, **{"from": bond.order, "to": order})
             return True
 
@@ -391,7 +400,7 @@ def _fix_valence(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
         candidate = _remove_bond(m, bond_idx)
         if _error_count(candidate) < _error_count(m):
             state.molecule = candidate
-            _record(state, issue.code, {"op": "removeBond", "bond": bond_idx}, _snapshot_bond(m, bond_idx), candidate,
+            _record(state, issue, {"op": "removeBond", "bond": bond_idx}, _snapshot_bond(m, bond_idx), candidate,
                     ("removed", bond_idx), a=bond.a, b=bond.b)
             return True
     return False
@@ -445,7 +454,7 @@ def _fix_aromatic(state: FixState, issue: Issue) -> bool:
                 candidate = _set_atom(m, idx, hCount=1)
                 if _error_count(candidate) < _error_count(m):
                     state.molecule = candidate
-                    _record(state, issue.code, {"op": "setHCount", "atom": idx, "hCount": 1}, _snapshot_atom(m, idx), candidate,
+                    _record(state, issue, {"op": "setHCount", "atom": idx, "hCount": 1}, _snapshot_atom(m, idx), candidate,
                             ("atom", idx), element="N", atom=idx, hCount=1)
                     return True
     # 2. Replace the aromatic flags with an explicit Kekulé structure.
@@ -460,9 +469,11 @@ def _fix_aromatic(state: FixState, issue: Issue) -> bool:
         before = {"bonds": [_snapshot_bond(m, i) for i in aromatic_bonds]}
         state.molecule = candidate
         op = {"op": "kekulize", "bonds": {str(k): v for k, v in assignment.items()}}
+        numbers = ", ".join(str(a + 1) for a in sorted(atoms))  # 1-based, as labelled in the editor
         state.ops.append(op)
-        state.log.append({"before": before, "reason": issue.code,
-                          "fix": {**op, "description": describe_fix("kekulize", atoms=", ".join(map(str, atoms)))},
+        state.log.append({"before": before, "reason": issue.code, "reasonParams": dict(issue.params),
+                          "fix": {**op, "description": describe_fix("kekulize", atoms=numbers),
+                                  "params": {"atoms": numbers}},
                           "after": {"bonds": [_snapshot_bond(candidate, i) for i in aromatic_bonds]}})
         return True
     return False
@@ -474,27 +485,27 @@ def _apply_fix(state: FixState, issue: Issue, focus_bonds: set[int]) -> bool:
         idx = issue.bonds[0]
         bond = m.bonds[idx]
         state.molecule = _remove_bond(m, idx)
-        _record(state, issue.code, {"op": "removeBond", "bond": idx}, _snapshot_bond(m, idx), state.molecule, ("removed", idx),
+        _record(state, issue, {"op": "removeBond", "bond": idx}, _snapshot_bond(m, idx), state.molecule, ("removed", idx),
                 a=bond.a, b=bond.b)
         return True
     if issue.code == "DUPLICATE_BOND":
         idx = issue.bonds[-1]
         bond = m.bonds[idx]
         state.molecule = _remove_bond(m, idx)
-        _record(state, issue.code, {"op": "removeBond", "bond": idx}, _snapshot_bond(m, idx), state.molecule, ("removed", idx),
+        _record(state, issue, {"op": "removeBond", "bond": idx}, _snapshot_bond(m, idx), state.molecule, ("removed", idx),
                 a=bond.a, b=bond.b)
         return True
     if issue.code == "ISOTOPE_UNKNOWN":
         idx = issue.atoms[0]
         before = _snapshot_atom(m, idx)
         state.molecule = _set_atom(m, idx, isotope=None)
-        _record(state, issue.code, {"op": "clearIsotope", "atom": idx}, before, state.molecule, ("atom", idx), atom=idx)
+        _record(state, issue, {"op": "clearIsotope", "atom": idx}, before, state.molecule, ("atom", idx), atom=idx)
         return True
     if issue.code == "UNDERSATURATED":
         idx = issue.atoms[0]
         before = _snapshot_atom(m, idx)
         state.molecule = _set_atom(m, idx, hCount=None)
-        _record(state, issue.code, {"op": "setHCount", "atom": idx, "hCount": None}, before, state.molecule, ("atom", idx),
+        _record(state, issue, {"op": "setHCount", "atom": idx, "hCount": None}, before, state.molecule, ("atom", idx),
                 element=m.atoms[idx].el, atom=idx, hCount="auto")
         return True
     if issue.code == "VALENCE_EXCEEDED":
@@ -534,7 +545,9 @@ def _snap_focus_geometry(state: FixState, focus_bonds: set[int]) -> None:
         state.molecule = m
         _record(state, "BOND_TOO_LONG" if length > expected else "BOND_TOO_SHORT",
                 {"op": "moveAtom", "atom": move.i, "x": float(new[0]), "y": float(new[1]), "z": float(new[2])},
-                before, m, ("atom", move.i), atom=move.i, length=round(expected, 3))
+                before, m, ("atom", move.i),
+                reason_params=display_params({"a": bond.a, "b": bond.b, "length": round(length, 3), "expected": round(expected, 3)}),
+                atom=move.i, length=round(expected, 3))
 
 
 def validate(molecule: Molecule, focus_atoms: list[int], focus_bonds: list[int], auto_fix: bool) -> dict[str, Any]:

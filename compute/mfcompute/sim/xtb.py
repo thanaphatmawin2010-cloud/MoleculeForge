@@ -102,8 +102,9 @@ def run(
             args += ["--hess"]
         if solvent:
             args += ["--alpb", solvent]
-        if max_cycles:
-            args += ["--cycles", str(max_cycles)]
+        if task in ("opt", "ohess"):
+            # xtb's default cycle budget can stop floppy molecules short of the minimum.
+            args += ["--cycles", str(max_cycles or max(500, 12 * mol.GetNumAtoms()))]
         threads = capabilities.recommended_threads()
         args += ["--parallel", str(threads)]
         env = capabilities.engine_env("xtb")

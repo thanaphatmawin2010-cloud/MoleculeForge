@@ -1,0 +1,31 @@
+{
+  "code": {
+    "AROMATIC_INVALID": "วงที่มีอะตอม {atomList} เป็นอะโรมาติกตามที่วาดไม่ได้ (ไม่มีโครงสร้างเคคูเลที่ถูกต้อง)",
+    "ATOMS_OVERLAP": "อะตอม {a} และ {b} อยู่ตำแหน่งเดียวกัน (ห่างกัน {distance} Å)",
+    "BOND_TOO_LONG": "พันธะ {a}–{b} ยาว {length} Å แต่ควรยาวประมาณ {expected} Å",
+    "BOND_TOO_SHORT": "พันธะ {a}–{b} ยาว {length} Å แต่ควรยาวประมาณ {expected} Å",
+    "CHARGE_UNUSUAL": "อะตอม {element} หมายเลข {atom} มีประจุฟอร์มัล {charge} ซึ่งไม่ปกติ",
+    "CLASH": "อะตอม {a} และ {b} ซึ่งไม่มีพันธะต่อกัน อยู่ห่างกันเพียง {distance} Å (ต่ำสุดที่ยอมรับ {limit} Å)",
+    "DUPLICATE_BOND": "อะตอม {a} และ {b} มีพันธะซ้ำกันสองครั้ง",
+    "EMPTY": "พื้นที่วาดว่างเปล่า",
+    "FRAGMENTS": "โครงสร้างนี้มี {count} ส่วนที่ไม่เชื่อมต่อกัน",
+    "HYPERVALENT": "อะตอม {element} หมายเลข {atom} ใช้เวเลนซ์ขยาย ({valence}) ซึ่งทำได้สำหรับธาตุตั้งแต่คาบที่ 3 ขึ้นไป",
+    "ISOTOPE_UNKNOWN": "เลขมวล {isotope} ไม่ใช่ไอโซโทปที่รู้จักของ {element}",
+    "RADICAL": "อะตอม {element} หมายเลข {atom} มีอิเล็กตรอนไม่เป็นคู่ {radicals, plural, other {# ตัว}}",
+    "SELF_BOND": "อะตอม {atom} มีพันธะกับตัวเอง",
+    "UNDERSATURATED": "อะตอม {element} หมายเลข {atom} มีอิเล็กตรอนไม่เป็นคู่ (อนุมูลอิสระ) เพราะจำนวนไฮโดรเจนน้อยเกินไป",
+    "UNKNOWN_ELEMENT": "“{element}” ไม่ใช่สัญลักษณ์ธาตุ",
+    "VALENCE_EXCEEDED": "อะตอม {element} หมายเลข {atom} มีพันธะรวม {valence} แต่ที่ประจุ {charge} มีได้ไม่เกิน {allowed}",
+    "VALID": "เชื่อมต่อพันธะถูกต้อง"
+  },
+  "fix": {
+    "clearIsotope": "ล้างไอโซโทปที่ไม่ถูกต้องบนอะตอม {atom}",
+    "kekulize": "กำหนดโครงสร้างเคคูเลที่ถูกต้องให้อะตอม {atoms}",
+    "moveAtom": "ย้ายอะตอม {atom} ให้ได้ความยาวพันธะ {length} Å",
+    "removeAtom": "ลบอะตอมไฮโดรเจนหมายเลข {atom} เพื่อให้มีเวเลนซ์ว่าง",
+    "removeBond": "ลบพันธะ {a}–{b} แล้ว",
+    "setBondOrder": "เปลี่ยนพันธะ {a}–{b} จาก{from, select, single {พันธะเดี่ยว} double {พันธะคู่} triple {พันธะสาม} aromatic {พันธะอะโรมาติก} other {{from}}}เป็น{to, select, single {พันธะเดี่ยว} double {พันธะคู่} triple {พันธะสาม} aromatic {พันธะอะโรมาติก} other {{to}}}",
+    "setCharge": "กำหนดประจุฟอร์มัลของอะตอม {element} หมายเลข {atom} เป็น {charge, number, ::sign-always}",
+    "setHCount": "กำหนดจำนวนไฮโดรเจนของอะตอม {element} หมายเลข {atom} เป็น {hCount}"
+  }
+}

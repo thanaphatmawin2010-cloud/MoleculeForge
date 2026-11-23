@@ -49,17 +49,17 @@ def compute_rdkit(mol: Chem.Mol) -> dict[str, dict[str, Any]]:
         gasteiger.append(round(q, 4) if q == q else None)
     try:
         qed = QED.qed(heavy)
-    except Exception:  # noqa: BLE001 - QED is undefined for some inorganic species
+    except Exception:
         qed = None
     chiral = Chem.FindMolChiralCenters(mol, includeUnassigned=True, useLegacyImplementation=False)
     props: dict[str, dict[str, Any]] = {
         "formula": _pv(rdMolDescriptors.CalcMolFormula(mol), "", "RDKit CalcMolFormula"),
         "molecularWeight": _pv(round(mw, 4), "g/mol", "IUPAC standard atomic weights (RDKit MolWt)"),
         "exactMass": _pv(round(Descriptors.ExactMolWt(mol), 6), "Da", "Monoisotopic mass (RDKit ExactMolWt)"),
-        "atomCount": _pv(mol.GetNumAtoms(), "", "count"),
-        "heavyAtomCount": _pv(heavy.GetNumAtoms(), "", "count"),
+        "atomCount": _pv(mol.GetNumAtoms(), "", "Atoms in the structure, hydrogens included (RDKit)"),
+        "heavyAtomCount": _pv(heavy.GetNumAtoms(), "", "Non-hydrogen atoms (RDKit)"),
         "netCharge": _pv(Chem.GetFormalCharge(mol), "e", "sum of formal charges"),
-        "radicalElectrons": _pv(sum(a.GetNumRadicalElectrons() for a in mol.GetAtoms()), "", "count"),
+        "radicalElectrons": _pv(sum(a.GetNumRadicalElectrons() for a in mol.GetAtoms()), "", "Unpaired electrons from valence analysis (RDKit)"),
         "logP": _pv(round(logp, 3), "", "Wildman–Crippen atomic contributions (RDKit)", uncertainty=0.68),
         "molarRefractivity": _pv(round(Crippen.MolMR(mol), 3), "cm³/mol", "Wildman–Crippen (RDKit)"),
         "tpsa": _pv(round(tpsa, 2), "Å²", "Ertl topological polar surface area (N,O)"),

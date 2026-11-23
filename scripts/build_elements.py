@@ -167,7 +167,7 @@ def atomic_mass(e: Any, isotopes: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def full_configuration(conf: dict[tuple[int, str], int]) -> str:
-    return " ".join(f"{n}{l}{count}" for (n, l), count in conf.items())
+    return " ".join(f"{n}{subshell}{count}" for (n, subshell), count in conf.items())
 
 
 def tag_uses(text: str | None, symbol: str, z: int) -> list[str]:
@@ -250,7 +250,7 @@ def build_element(z: int) -> dict[str, Any]:
         conf = e.ec.conf
         shells = list(e.ec.electrons_per_shell().values())
         full = full_configuration(conf)
-    except Exception:  # noqa: BLE001
+    except Exception:
         conf, shells, full = {}, [], ""
     ion_energies = [round(v * EV_TO_KJMOL, 3) for _, v in sorted(e.ionenergies.items())] if e.ionenergies else []
     ea_ev = num(e.electron_affinity)
@@ -328,7 +328,7 @@ def crosscheck(elements: list[dict[str, Any]]) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(PTJ_URL, timeout=60) as resp:
             ptj = json.load(resp)["elements"]
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {"status": "unavailable", "error": str(exc)}
     by_z = {item["number"]: item for item in ptj}
     fields = [
