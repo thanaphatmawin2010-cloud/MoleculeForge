@@ -121,10 +121,13 @@ def python_entries() -> list[Entry]:
             entry.files.append(str(dest.relative_to(OUT)))
             entry.license = "MIT AND LGPL-2.1 (CUDA/OpenCL platforms)" if dist.metadata["Name"].lower() == "openmm" else entry.license
         entries.append(entry)
-    # The interpreter and the PyInstaller bootloader are part of the frozen sidecar.
-    python_license = Path(sys.base_prefix) / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "LICENSE.txt"
+    # The interpreter and the PyInstaller bootloader are part of the frozen sidecar. The licence file
+    # sits in lib/pythonX.Y/ on Linux and macOS and at the top of the installation on Windows.
+    base = Path(sys.base_prefix)
+    version_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
     py = Entry("python", "CPython", sys.version.split()[0], "PSF-2.0", source="python.org")
-    copy_texts(py, [python_license])
+    copy_texts(py, [next((c for c in (base / "lib" / version_dir / "LICENSE.txt", base / "LICENSE.txt",
+                                      base / "Lib" / "LICENSE.txt") if c.is_file()), base / "LICENSE.txt")])
     entries.append(py)
     try:
         pyi = metadata.distribution("pyinstaller")
@@ -138,8 +141,10 @@ def python_entries() -> list[Entry]:
 
 
 def npm_entries() -> list[Entry]:
-    out = subprocess.run(["pnpm", "--dir", str(ROOT / "ui"), "list", "--prod", "--json", "--depth", "Infinity"],
-                         capture_output=True, text=True, check=True).stdout
+    # shutil.which finds pnpm.cmd on Windows, which CreateProcess will not resolve from a bare name.
+    pnpm = shutil.which("pnpm") or "pnpm"
+    out = subprocess.run([pnpm, "--dir", str(ROOT / "ui"), "list", "--prod", "--json", "--depth", "Infinity"],
+                         capture_output=True, text=True, encoding="utf-8", check=True).stdout
     tree = json.loads(out)
     found: dict[tuple[str, str], Path] = {}
 
@@ -165,7 +170,7 @@ def npm_entries() -> list[Entry]:
 def cargo_entries() -> list[Entry]:
     manifest = ROOT / "app-shell" / "src-tauri" / "Cargo.toml"
     meta = json.loads(subprocess.run(["cargo", "metadata", "--format-version", "1", "--manifest-path", str(manifest)],
-                                     capture_output=True, text=True, check=True).stdout)
+                                     capture_output=True, text=True, encoding="utf-8", check=True).stdout)
     entries = []
     for package in sorted(meta["packages"], key=lambda p: (p["name"], p["version"])):
         if package["source"] is None:  # the shell itself
@@ -219,6 +224,23 @@ def fetched_entries() -> list[Entry]:
                 shutil.copyfile(path, dest)
                 entry.files.append(str(dest.relative_to(OUT)))
             entries.append(entry)
+    # Windows: the Visual C++ runtime deployed next to llama-server (fetch_engines.copy_vc_runtime).
+    # It is the same Microsoft redistributable that conda-forge ships as vc14_runtime, whose licence
+    # text the conda-built engines already carry.
+    for llama in sorted((ROOT / "engines").glob("windows-*/llama")):
+        dlls = sorted(p.name for p in llama.glob("*.dll") if p.name.lower().startswith(("vcruntime", "msvcp", "vcomp", "concrt", "vccorlib")))
+        if not dlls:
+            continue
+        entry = Entry("engines", "llama/Microsoft-Visual-C++-runtime", "14.x", "LicenseRef-MicrosoftVisualCpp2015-2022Runtime",
+                      source="Visual Studio redistributable files, app-local next to llama-server: " + ", ".join(dlls))
+        texts = sorted(p for p in (ROOT / "engines").glob(f"{llama.parent.name}/*/share/licenses/conda/vc14_runtime/**/*") if p.is_file())
+        target = OUT / "engines" / "llama" / "Microsoft-Visual-C++-runtime"
+        for path in texts[:5]:
+            dest = target / path.name
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, dest)
+            entry.files.append(str(dest.relative_to(OUT)))
+        entries.append(entry)
     fonts = ROOT / "data" / "fonts" / "OFL.txt"
     font = Entry("fonts", "IBM-Plex-Sans-Thai", "1.1.0", "OFL-1.1", source="@ibm/plex-sans-thai 1.1.0 (PDF reports)")
     copy_texts(font, [fonts])

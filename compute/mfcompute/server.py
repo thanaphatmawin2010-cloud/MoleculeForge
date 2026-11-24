@@ -15,6 +15,7 @@ Protocol
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import logging.handlers
@@ -228,6 +229,10 @@ def main() -> None:
     runtime.SERVER = server
     server.notify("ready", {"version": __version__, "pid": os.getpid(), "methods": sorted(METHODS)})
     log.info("MoleculeForge compute %s ready (%d methods)", __version__, len(METHODS))
+    if isinstance(sys.stdin, io.TextIOWrapper):
+        # Requests are UTF-8 JSON lines. Windows would otherwise decode the pipe with the ANSI code
+        # page (cp1252, or cp874 on Thai systems) and mangle non-ASCII text such as Thai names.
+        sys.stdin.reconfigure(encoding="utf-8", errors="replace")
     try:
         for line in sys.stdin:
             server.handle_line(line)

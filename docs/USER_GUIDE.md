@@ -6,20 +6,47 @@ on your computer: nothing is uploaded, and no internet connection is needed.
 
 ## Installing
 
-| System | Installer | Notes |
+Download from the project's **Releases** page on GitHub. Pick the file for your computer:
+
+| Computer | Download | After downloading |
 |---|---|---|
-| Windows 10/11 | `MoleculeForge_1.0.0_x64-setup.exe` or `.msi` | Installs for the current user; the WebView2 runtime is included. |
-| macOS 11+ | `MoleculeForge_1.0.0_aarch64.dmg` / `_x64.dmg` | Drag MoleculeForge to Applications. |
-| Linux | `MoleculeForge_1.0.0_amd64.AppImage` or `.deb` | AppImage: make it executable and run it. `.deb`: `sudo apt install ./MoleculeForge_1.0.0_amd64.deb`. |
+| Windows 10 (1809 or later) or 11, 64-bit | `MoleculeForge_1.0.0_x64-setup.exe` (or the `.msi`) | Run it. Installs for the current user; the WebView2 runtime is included. |
+| Mac with Apple silicon (M1 or newer), macOS 14 or later | `MoleculeForge_1.0.0_aarch64.dmg`, in two parts | Join the parts (below), open the `.dmg`, drag MoleculeForge to Applications. |
+| Mac with an Intel processor, macOS 14 or later | `MoleculeForge_1.0.0_x64.dmg`, in two parts | As above. |
+| Linux, 64-bit (glibc 2.35 or later: Ubuntu 22.04, Debian 12, Fedora 36 or newer) | `MoleculeForge_1.0.0_amd64.deb` or `.AppImage`, in two parts each | Join the parts. `.deb`: `sudo apt install ./MoleculeForge_1.0.0_amd64.deb`. AppImage: make it executable and run it. |
 
 Every installer contains all the calculation engines, the element and molecule data, and the AI
-model, so nothing has to be downloaded after installation.
+model, so nothing has to be downloaded after installation and the app never goes online.
+
+**Joining parts.** GitHub limits each download to 2 GB, and the macOS and Linux installers are
+larger because they include the bigger AI model, so they are published as `.part1` and `.part2`.
+Put both parts in one folder, open Terminal there (for the Downloads folder, run `cd ~/Downloads`)
+and join them, for example:
+
+```bash
+cat MoleculeForge_1.0.0_aarch64.dmg.part1 MoleculeForge_1.0.0_aarch64.dmg.part2 > MoleculeForge_1.0.0_aarch64.dmg
+```
+
+The release notes list the exact command for each file and a `SHA256SUMS.txt` to check the result.
+
+**First launch.** The installers are not code-signed, so the system asks once:
+
+* Windows: if SmartScreen shows *Windows protected your PC*, click **More info**, then **Run anyway**.
+* macOS: if macOS says it cannot verify the app, or that the app *is damaged*, run
+  `xattr -cr /Applications/MoleculeForge.app` in Terminal and open it again. This tells macOS you
+  trust the app and the calculation engines inside it. (Alternatively, click **Done**, open
+  **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.)
+* Linux: nothing extra. Some distributions need FUSE 2 for AppImages (`libfuse2`).
+
+The app needs about 7 GB of free disk space and 8 GB of memory (16 GB is more comfortable when the
+assistant and a large simulation run together).
 
 On Windows, two things differ:
 
 * Windows installers cannot be larger than 2 GB, so they bundle a smaller model (Qwen3-1.7B). The
-  larger model used on macOS and Linux (Qwen3-4B-Instruct-2507) can be loaded from
-  **Assistant → Language model**.
+  larger model used on macOS and Linux (Qwen3-4B-Instruct-2507) can be downloaded separately
+  (`Qwen3-4B-Instruct-2507-Q4_K_M.gguf` from unsloth/Qwen3-4B-Instruct-2507-GGUF on Hugging Face)
+  and loaded from **Assistant → Language model**.
 * PySCF, the density-functional (B3LYP) engine, is not available for Windows. Dipoles, orbitals
   and charges come from GFN2-xTB there. Small hydrides such as water keep their MMFF94 geometry
   after repair; its bond angles are within 1.5° of experiment for water, ammonia, hydrogen

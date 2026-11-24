@@ -26,3 +26,6 @@ data/fonts/
 # OS / editors
 .DS_Store
 *.swp
+
+# Written in CI by scripts/macos_min_version.py when the payload needs a newer macOS
+app-shell/src-tauri/tauri.macos.conf.json

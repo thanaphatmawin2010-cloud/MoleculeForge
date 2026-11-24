@@ -14,13 +14,13 @@ the specification left room, the status of each requirement, and the self-audit 
 | Motion, icons, palette, state | Framer Motion, Lucide, cmdk, Zustand | 11.18 / 0.460 / 1.1 / 5.1 | MIT / ISC / MIT / MIT | |
 | 2D sketcher | MoleculeForge SVG sketcher (own code) | | MIT | Ketcher and Kekule.js rejected: their look and interaction model fight the bespoke design (P7), and Ketcher's bundle is large. RDKit (sidecar) supplies depiction coordinates and wedges |
 | 3D viewer | [Three.js](https://github.com/mrdoob/three.js) with an own instanced scene | 0.170.0 | MIT | Mol* and 3Dmol.js rejected for the same reason; instancing draws all atoms and all bonds in two calls |
-| Cheminformatics | [RDKit](https://github.com/rdkit/rdkit) | 2026.09.2 | BSD-3-Clause | |
+| Cheminformatics | [RDKit](https://github.com/rdkit/rdkit) | 2026.09.2 (2025.09.3 on Intel Macs) | BSD-3-Clause | RDKit publishes no Intel-Mac wheel after 2025.09.3; the full test suite passes with both |
 | File formats | RDKit readers/writers | | BSD-3-Clause | [Open Babel](https://github.com/openbabel/openbabel) rejected: GPL-2.0, and RDKit covers MOL/SDF/SMILES/InChI/XYZ/PDB |
 | JS cheminformatics | none | | | OpenChemLib not needed: validation runs in the sidecar in 2–5 ms |
 | Mechanics / dynamics | [OpenMM](https://github.com/openmm/openmm) | 8.6.1 | MIT; LGPL-2.1 for the CUDA/OpenCL platforms | MMFF94/MMFF94s implemented as OpenMM custom forces; energies match RDKit to machine precision (`tests/unit/compute/test_openmm_mmff.py`) |
 | Semi-empirical QM | [xtb](https://github.com/grimme-lab/xtb) (GFN2-xTB, GFN-FF) | 6.8.0 | LGPL-3.0 | separate executable (conda-forge build, with dftd4, s-dftd3, tblite, OpenBLAS) |
 | Heats of formation | [MOPAC](https://github.com/openmopac/mopac) (PM7) | 23.2.5 | Apache-2.0 | added: GFN2-xTB gives no ΔHf |
-| DFT | [PySCF](https://github.com/pyscf/pyscf) | 2.15.1 | Apache-2.0 | Psi4 rejected: distributed through conda only, which makes freezing it into the sidecar impractical. PySCF has no Windows build; on Windows, DFT is reported unavailable |
+| DFT | [PySCF](https://github.com/pyscf/pyscf) | 2.15.0 | Apache-2.0 | Psi4 rejected: distributed through conda only, which makes freezing it into the sidecar impractical. PySCF has no Windows build; on Windows, DFT is reported unavailable |
 | DFT geometry optimiser | [PyBerny](https://github.com/jhrmnn/pyberny) (+ [MolSym](https://github.com/NASymmetry/MolSym)) | 0.7.0 (1.3.1) | MPL-2.0 (MIT) | [geomeTRIC](https://github.com/leeping/geomeTRIC) used first, then removed: its licence adds a clause forbidding use in AI-training datasets to BSD-3-Clause, a field-of-use restriction every redistributor would inherit |
 | Docking | [AutoDock Vina](https://github.com/ccsb-scripps/AutoDock-Vina) + [Meeko](https://github.com/forlilab/Meeko) (+ gemmi) | 1.2.7 / 0.8.0 (0.7.5) | Apache-2.0 / LGPL-2.1 (MPL-2.0) | Vina is a separate executable; Meeko ships as plain, replaceable Python source in the frozen sidecar (`_internal/meeko/`) |
 | Numerics | NumPy, SciPy | 2.5.5 / 1.18.1 | BSD-3-Clause | |
@@ -102,6 +102,31 @@ libraries, Meeko, libquadmath, OpenMM's GPU platforms) are separate processes or
   `scripts/build_appimage.py` builds the AppImage without the payload, adds it, and repacks it.
 * **Fonts and models are fetched at build time** and verified against `scripts/engines.lock.json`.
   Nothing is fetched at runtime.
+* **Cross-platform builds.** Checked before the first Windows and macOS build, against the
+  packages actually published for each platform:
+  * conda-forge resolves BLAS to Intel MKL on Windows, about 700 MB in each of the xtb and MOPAC
+    engines, which would push the Windows installers past 2 GB. `libblas=*=*openblas` is pinned for
+    every conda engine (Linux and macOS already used OpenBLAS), which keeps both Windows engines at
+    164 MB together.
+  * llama.cpp is built the way its own CI builds each platform: clang and Ninja on Windows (MSVC is
+    not what upstream tests the CPU variants with) with the Vulkan back-end and all x86 CPU
+    variants; on macOS one CPU back-end linked directly (Metal on Apple silicon; AVX2/FMA on Intel)
+    with an `@loader_path` rpath, so the libraries are found next to `llama-server` wherever the app
+    is installed. MSVC-ABI binaries need the Visual C++ runtime, so its redistributable DLLs are
+    deployed next to `llama-server`.
+  * The Linux build runs on Ubuntu 22.04 for the widest glibc compatibility (2.35), with the LunarG
+    Vulkan SDK because that release's Vulkan headers are too old for llama.cpp.
+  * macOS 14 is the minimum: the Apple-silicon and Intel wheels of numpy and SciPy link Accelerate
+    from macOS 14, and AutoDock Vina's macOS binaries are built for 14.0. `scripts/macos_min_version.py`
+    reads the requirement of every Mach-O file in the payload and raises the declared minimum if
+    anything needs more, so an older Mac gets a clear message instead of a crash.
+  * On Windows the sidecar reads its JSON-RPC input as UTF-8 explicitly. Windows would otherwise
+    decode the pipe with the ANSI code page: tested with the Thai code page (cp874), a request
+    naming a molecule "น้ำ" got no reply at all; with the fix the name comes back intact.
+* **Release files over 2 GB.** GitHub release files must be under 2 GiB and the macOS and Linux
+  installers carry the 2.5 GB model, so `scripts/release_assets.py` publishes them in parts with a
+  one-line join command and SHA-256 checksums in the release notes. The whole installers are also
+  kept as workflow artifacts for 90 days.
 
 ## Assumptions
 
@@ -117,10 +142,12 @@ libraries, Meeko, libquadmath, OpenMM's GPU platforms) are separate processes or
 5. **"Large peptide fails Lipinski"** is tested with deca-alanine (MW 729, 11 donors).
 6. **Unknown element values** are null with status `unknown`, never estimated. Values for Z ≥ 100
    and the bulk properties of At and Fr are marked `predicted`.
-7. **Windows and macOS installers and code signing** are produced by
-   `.github/workflows/release.yml`. This build machine runs Linux, so only the Linux installers
-   were built, installed and launched here. macOS builds are signed and notarised when the Apple
-   secrets are configured; Windows `.msi`/`.exe` files can be signed afterwards with `signtool`.
+7. **Windows and macOS installers** are produced by `.github/workflows/release.yml` on GitHub's
+   Windows, macOS (Apple silicon and Intel) and Ubuntu 22.04 runners. They are not code-signed (the
+   owner chose unsigned installers): Windows shows SmartScreen and macOS asks for confirmation on
+   first launch, and the release notes give the steps. The macOS app is ad-hoc signed, which Apple
+   silicon requires to run it. Signing can be added later: `signtool` for the Windows files, and
+   Tauri's `APPLE_*` variables for macOS signing and notarisation.
 8. **The 2 GB Windows installer limit.** Windows Installer and NSIS packages cannot exceed 2 GB and
    the default model alone is 2.5 GB, so Windows bundles Qwen3-1.7B (1.1 GB). It passes the same
    assistant tests as the default model (tools called, MW 46.07 for ethanol, refusal, loopback only).
@@ -251,5 +278,6 @@ section against the running application, the test results and the licences.
 | 13. Full audit (repository state, code drift since the installer build, document links, this log's figures) | no code changed after the installers were built and every link resolves, but the §7.9 row still gave 770 translation keys (775 since loop 11) | figure corrected |
 | 14. Full audit (every figure in the documents recomputed from its source: translation keys, licences, library size, payload, discrepancies, test counts, versions, granted commands; quick gates and OSV re-run) | none | |
 | 15. Full audit (both installed builds relaunched with the socket audit; figures recomputed; gates re-run; no code changed since the installers were built) | none | |
+| 16. Cross-platform pre-flight (before the first Windows and macOS build: every package, binary and runner checked against what is actually published for each platform) | the release workflow named retired macOS runners (macos-13, macos-14) and used the `runner` context where GitHub does not allow it; PySCF 2.15.1 has no Apple-silicon wheel and RDKit no Intel-Mac wheel after 2025.09.3; conda-forge picks Intel MKL on Windows (about 700 MB per engine, past the 2 GB installer limit); upstream llama.cpp does not test its CPU variants with MSVC, and MSVC-built binaries need the Visual C++ runtime; macOS llama.cpp libraries would have pointed at the build directory; Ubuntu 22.04's Vulkan headers are too old for llama.cpp; numpy, SciPy and Vina need macOS 14 while the app declared 11; Windows would decode the sidecar's input with the ANSI code page (a Thai molecule name got no reply); `pnpm` and the CPython licence path were not found on Windows; GitHub release files must be under 2 GiB | macos-15 and macos-15-intel runners and step-level contexts; PySCF 2.15.0 and an Intel-Mac RDKit pin (752 fast tests pass with each); OpenBLAS pinned; clang and Ninja on Windows and the redistributable runtime next to llama-server; `@loader_path` rpaths; the LunarG Vulkan SDK; macOS 14 minimum checked by `scripts/macos_min_version.py`; UTF-8 input; `shutil.which` and a Windows licence path; `scripts/release_assets.py` (parts, notes, checksums). The validation report was regenerated with PySCF 2.15.0: every value is unchanged |
 
-Audits 14 and 15 were consecutive full audits with no findings, which meets §12's exit criterion for everything that can be checked on this machine. Two §13 items remain NOT VERIFIED HERE because they need hardware this machine does not have: the Windows and macOS installers (built by `.github/workflows/release.yml`, not yet run) and GPU performance (60 fps at 5,000 atoms, GPU-accelerated MD and LLM).
+Audits 14 and 15 were consecutive full audits with no findings, which meets §12's exit criterion for everything that can be checked on this machine. Two §13 items remain NOT VERIFIED HERE because they need hardware this machine does not have: the Windows and macOS installers (built by `.github/workflows/release.yml` on GitHub's runners; see loop 16 for the checks made before its first run) and GPU performance (60 fps at 5,000 atoms, GPU-accelerated MD and LLM).

@@ -1,4 +1,8 @@
 name: Release installers
+# Builds the Windows, macOS (Apple silicon and Intel) and Linux installers. A pushed tag v* also
+# publishes them as a GitHub release: installers of 2 GB or more (the macOS and Linux ones carry the
+# 2.5 GB model) are split into parts there, with joining instructions in the release notes, and every
+# installer is kept whole as a workflow artifact for 90 days.
 on:
   push:
     tags: ["v*"]
@@ -7,78 +11,258 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  draft:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Draft release for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
+                 --title "MoleculeForge ${GITHUB_REF_NAME#v}" --notes "Installers are being built."
+
   build:
+    needs: draft
+    if: ${{ !cancelled() && needs.draft.result != 'failure' }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
+          - os: ubuntu-22.04 # oldest supported glibc (2.35) for the widest Linux compatibility
             platform: linux-x64
             bundles: deb
           - os: windows-2022
             platform: windows-x64
             bundles: msi,nsis
-          - os: macos-14
+          - os: macos-15
             platform: macos-arm64
             bundles: dmg
-          - os: macos-13
+          - os: macos-15-intel
             platform: macos-x64
             bundles: dmg
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 240
+    timeout-minutes: 330
+    defaults:
+      run:
+        shell: bash
+    env:
+      MF_PLATFORM: ${{ matrix.platform }}
+      VULKAN_VERSION: 1.4.309.0
     steps:
       - uses: actions/checkout@v4
+
+      - name: Free disk space and show what is left
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          elif [ "$RUNNER_OS" = macOS ] && [ -n "${ANDROID_HOME:-}" ]; then
+            rm -rf "$ANDROID_HOME" || true
+          fi
+          df -h . || true
+
       - uses: pnpm/action-setup@v4
         with: { version: 10 }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: compute/uv.lock
       - uses: dtolnay/rust-toolchain@stable
-      - name: Linux build dependencies
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: app-shell/src-tauri, cache-on-failure: true }
+
+      - name: Linux build dependencies (WebKitGTK; Vulkan SDK for llama.cpp's GPU back-end)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev \
-            cmake spirv-headers libvulkan-dev glslc patchelf
-      - name: Windows GPU toolchain (Vulkan SDK for llama.cpp)
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev patchelf xz-utils
+          # Ubuntu 22.04's Vulkan headers and glslc are too old for llama.cpp; use the LunarG SDK.
+          curl -fsSL --retry 4 -o "$RUNNER_TEMP/vulkansdk.tar.xz" \
+            "https://sdk.lunarg.com/sdk/download/$VULKAN_VERSION/linux/vulkansdk-linux-x86_64-$VULKAN_VERSION.tar.xz"
+          mkdir -p "$RUNNER_TEMP/vulkansdk" && tar -xJf "$RUNNER_TEMP/vulkansdk.tar.xz" -C "$RUNNER_TEMP/vulkansdk"
+          sdk="$RUNNER_TEMP/vulkansdk/$VULKAN_VERSION/x86_64"
+          "$sdk/bin/glslc" --version
+          echo "VULKAN_SDK=$sdk" >> "$GITHUB_ENV"
+          echo "$sdk/bin" >> "$GITHUB_PATH"
+
+      - name: Vulkan SDK (Windows; llama.cpp's GPU back-end)
         if: runner.os == 'Windows'
-        uses: humbletim/install-vulkan-sdk@v1.2
-        with: { version: 1.4.309.0, cache: true }
+        shell: pwsh
+        run: |
+          $installer = "$env:RUNNER_TEMP\VulkanSDK-Installer.exe"
+          curl.exe -fsSL --retry 4 -o $installer "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/VulkanSDK-$env:VULKAN_VERSION-Installer.exe"
+          Start-Process -FilePath $installer -ArgumentList '--accept-licenses', '--default-answer', '--confirm-command', 'install' -Wait -NoNewWindow
+          $sdk = "C:\VulkanSDK\$env:VULKAN_VERSION"
+          & "$sdk\Bin\glslc.exe" --version
+          "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$sdk\Bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Windows compilers for llama.cpp (clang and Ninja, as llama.cpp's own Windows builds use)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install ninja -y --no-progress
+          choco install llvm --version=22.1.8 -y --no-progress --allow-downgrade
+          "C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: macOS deployment target
+        if: runner.os == 'macOS'
+        # numpy, SciPy and AutoDock Vina already need macOS 14; build llama.cpp and the shell to match.
+        run: echo "MACOSX_DEPLOYMENT_TARGET=14.0" >> "$GITHUB_ENV"
+
+      - name: Restore built engines
+        id: engines-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            engines/${{ matrix.platform }}
+            engines/.tools
+          key: engines-${{ matrix.platform }}-${{ hashFiles('scripts/engines.lock.json', 'scripts/fetch_engines.py') }}
+
       - name: Fetch, build and verify the bundled engines, model and fonts
-        shell: bash
-        run: python3 scripts/fetch_engines.py --platform ${{ matrix.platform }}
+        env:
+          MF_LLAMA_BUILD_DIR: ${{ runner.temp }}/llb # short path: Windows build tools limit path length
+        run: uv run --no-project python scripts/fetch_engines.py --platform "$MF_PLATFORM"
+
+      - name: Save built engines (also when a later step fails)
+        if: steps.engines-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            engines/${{ matrix.platform }}
+            engines/.tools
+          key: engines-${{ matrix.platform }}-${{ hashFiles('scripts/engines.lock.json', 'scripts/fetch_engines.py') }}
+
       - name: Frozen compute sidecar
-        shell: bash
-        run: cd compute && uv sync --all-groups && uv run pyinstaller packaging/moleculeforge-compute.spec --noconfirm
+        run: cd compute && uv sync --locked --all-groups && uv run pyinstaller packaging/moleculeforge-compute.spec --noconfirm
+
+      - name: Tests on this platform (unit tests from source, IPC and chemistry tests against the frozen sidecar)
+        id: tests
+        continue-on-error: true
+        timeout-minutes: 60
+        run: |
+          cd compute
+          exe="$PWD/dist/compute/moleculeforge-compute"
+          if [ "$RUNNER_OS" = Windows ]; then exe="$(cygpath -w "$exe.exe")"; fi
+          MF_SIDECAR_EXE="$exe" uv run pytest -m "not slow" -p no:cacheprovider --junitxml="../test-results/$MF_PLATFORM-fast.xml"
+
+      - name: Assistant tests with the bundled model (slow on CPU-only runners)
+        id: ai-tests
+        continue-on-error: true
+        timeout-minutes: 75
+        run: |
+          cd compute
+          exe="$PWD/dist/compute/moleculeforge-compute"
+          if [ "$RUNNER_OS" = Windows ]; then exe="$(cygpath -w "$exe.exe")"; fi
+          MF_SIDECAR_EXE="$exe" uv run pytest -m slow -p no:cacheprovider --junitxml="../test-results/$MF_PLATFORM-slow.xml"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.platform }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Licences and installer payload
-        shell: bash
         run: |
           pnpm install --frozen-lockfile
           cd compute
           uv run python ../scripts/collect_licenses.py
-          uv run python ../scripts/stage_resources.py --platform ${{ matrix.platform }}
+          uv run python ../scripts/stage_resources.py --platform "$MF_PLATFORM"
+
+      - name: Minimum macOS the payload needs
+        if: runner.os == 'macOS'
+        run: |
+          uv run --no-project python scripts/macos_min_version.py app-shell/src-tauri/resources \
+            --minimum 14.0 --write-config app-shell/src-tauri/tauri.macos.conf.json
+          minimum=14.0
+          if [ -f app-shell/src-tauri/tauri.macos.conf.json ]; then
+            minimum=$(uv run --no-project python -c "import json;print(json.load(open('app-shell/src-tauri/tauri.macos.conf.json'))['bundle']['macOS']['minimumSystemVersion'])")
+          fi
+          echo "MF_MACOS_MINIMUM=$minimum" >> "$GITHUB_ENV"
+
       - name: Installers
-        shell: bash
-        env:
-          # Optional macOS signing and notarisation; builds are unsigned when these secrets are
-          # absent. Windows installers are signable afterwards with signtool (see BUILD_LOG.md).
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm tauri build --bundles ${{ matrix.bundles }}
+        # Unsigned: Windows shows SmartScreen and macOS asks for confirmation on first launch (the macOS
+        # app is ad-hoc signed so Apple silicon runs it). See the release notes for the steps.
+        run: |
+          df -h . || true
+          pnpm tauri build --bundles ${{ matrix.bundles }}
+
       - name: AppImage (built without linuxdeploy scanning the self-contained payload)
         if: runner.os == 'Linux'
         run: compute/.venv/bin/python scripts/build_appimage.py
-      - uses: actions/upload-artifact@v4
+
+      - name: Collect installers
+        run: |
+          bundle=app-shell/src-tauri/target/release/bundle
+          mkdir -p installers meta
+          find "$bundle" -maxdepth 2 -type f ! -name 'rw.*' \( -name '*.deb' -o -name '*.AppImage' -o -name '*.msi' -o -name '*-setup.exe' -o -name '*.dmg' \) -exec mv {} installers/ \;
+          ls -l installers
+          # Free the bundler's staging copies (each holds the whole payload) before splitting.
+          rm -rf "$bundle"/deb/*/ "$bundle"/appimage/*.AppDir "$bundle"/macos app-shell/src-tauri/target/release/wix app-shell/src-tauri/target/release/nsis || true
+          args=(--platform "$MF_PLATFORM" --out release --meta-out "meta/$MF_PLATFORM.json")
+          if [ -n "${MF_MACOS_MINIMUM:-}" ]; then args+=(--macos-minimum "$MF_MACOS_MINIMUM"); fi
+          uv run --no-project python scripts/release_assets.py split "${args[@]}" installers/*
+          ls -l release
+          df -h . || true
+
+      - name: Keep the whole installers as a workflow artifact
+        uses: actions/upload-artifact@v4
         with:
           name: moleculeforge-${{ matrix.platform }}
-          path: |
-            app-shell/src-tauri/target/release/bundle/**/*.deb
-            app-shell/src-tauri/target/release/bundle/**/*.AppImage
-            app-shell/src-tauri/target/release/bundle/**/*.msi
-            app-shell/src-tauri/target/release/bundle/**/*.exe
-            app-shell/src-tauri/target/release/bundle/**/*.dmg
+          path: installers/
+          retention-days: 90
+          compression-level: 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meta-${{ matrix.platform }}
+          path: meta/
+          retention-days: 90
+
+      - name: Upload to the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for file in release/*; do
+            uploaded=no
+            for attempt in 1 2 3 4; do
+              if gh release upload "$GITHUB_REF_NAME" "$file" --repo "$GITHUB_REPOSITORY" --clobber; then
+                uploaded=yes; break
+              fi
+              echo "upload of $file failed (attempt $attempt); retrying"; sleep $((attempt * 20))
+            done
+            [ "$uploaded" = yes ] || { echo "::error::could not upload $file"; exit 1; }
+          done
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: meta-*
+          path: meta
+      - name: Release notes, checksums and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/release_assets.py notes --tag "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --meta-dir meta --sums SHA256SUMS.txt \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > notes.md
+          cat SHA256SUMS.txt
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file notes.md --draft=false --latest

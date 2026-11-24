@@ -65,5 +65,5 @@ makes: SMILES → `chem.convertFormat` → `chem.repairGeometry` (one-click repa
 
 ## Environment
 
-* MoleculeForge compute 1.0.0 on Linux x86_64, 4 physical cores; engines: xtb 6.8.0, MOPAC 23.2.5, AutoDock Vina 1.2.7; PySCF 2.15.1; OpenMM 8.6.1; RDKit 2026.09.2
-* Wall time per molecule (repair + standard properties): Water 11.1 s, Methane 14.0 s, Ammonia 11.7 s, Benzene 11.8 s, Carbon dioxide 10.3 s, Ethene 12.7 s, Ethyne 9.3 s, Ethane 21.0 s, Methanol 14.0 s, Ethanol 34.2 s
+* MoleculeForge compute 1.0.0 on Linux x86_64, 4 physical cores; engines: xtb 6.8.0, MOPAC 23.2.5, AutoDock Vina 1.2.7; PySCF 2.15.0; OpenMM 8.6.1; RDKit 2026.09.2
+* Wall time per molecule (repair + standard properties): Water 11.0 s, Methane 15.1 s, Ammonia 12.6 s, Benzene 13.3 s, Carbon dioxide 10.8 s, Ethene 14.1 s, Ethyne 10.2 s, Ethane 22.7 s, Methanol 15.7 s, Ethanol 40.7 s

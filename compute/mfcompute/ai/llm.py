@@ -157,7 +157,7 @@ def ensure_running(ctx: JobContext | None = None, timeout: float = 300.0) -> Non
             ctx.check()
             ctx.progress(5, "ai.loading", "Loading the local model into memory")
         if RUNTIME.proc is None or RUNTIME.proc.poll() is not None:
-            tail = RUNTIME.log_path.read_text(errors="replace")[-1500:] if RUNTIME.log_path else ""
+            tail = RUNTIME.log_path.read_text(encoding="utf-8", errors="replace")[-1500:] if RUNTIME.log_path else ""
             raise RpcError(ENGINE_UNAVAILABLE, "The local model runtime exited during start-up", {"log": tail})
         try:
             code, _ = _request("GET", "/health", None, timeout=2.0)

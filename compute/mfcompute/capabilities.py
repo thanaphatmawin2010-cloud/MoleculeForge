@@ -29,7 +29,9 @@ _CACHE: dict[str, Any] | None = None
 def _run(args: list[str], timeout: float = 6.0) -> str:
     try:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        out = subprocess.run(args, capture_output=True, text=True, timeout=timeout, creationflags=flags, check=False)
+        # Tool output is decoded leniently: on Windows it arrives in the console code page.
+        out = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                             timeout=timeout, creationflags=flags, check=False)
         return (out.stdout or "") + (out.stderr or "")
     except (OSError, subprocess.SubprocessError):
         return ""
@@ -151,7 +153,8 @@ def _engine_version(engine: str, exe_name: str, args: list[str], pattern: str) -
         return {"available": False}
     env = engine_env(engine)
     try:
-        out = subprocess.run([str(exe), *args], capture_output=True, text=True, timeout=20, env=env,
+        out = subprocess.run([str(exe), *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                             timeout=20, env=env,
                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), check=False,
                              cwd=str(paths.scratch_dir()))
         text = (out.stdout or "") + (out.stderr or "")

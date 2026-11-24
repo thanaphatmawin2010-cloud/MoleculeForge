@@ -14,11 +14,15 @@ your computer, with no network access at runtime, in English and Thai.
 
 ## Install
 
-Download the installer for your system: `.exe` or `.msi` for Windows, `.dmg` for macOS (arm64 or
-x64), `.AppImage` or `.deb` for Linux. Run it; there is nothing else to set up. Each installer
-already contains the calculation engines, the data and the language model. Windows installers
-cannot exceed 2 GB, so they bundle a smaller model, and B3LYP (PySCF) is not available on Windows;
-the [user guide](docs/USER_GUIDE.md#installing) explains both.
+Download the installer for your system from the GitHub **Releases** page: the `-setup.exe` (or
+`.msi`) for Windows, the `.dmg` for macOS (Apple silicon or Intel, macOS 14 or later), the `.deb`
+or `.AppImage` for Linux. Each installer already contains the calculation engines, the data and the
+language model; there is nothing else to set up and the app never goes online. The macOS and Linux
+installers are larger than GitHub's 2 GB limit per file, so they are published in two parts that
+are joined with one command before installing. The installers are not code-signed, so Windows and
+macOS ask for confirmation on first launch. Windows installers cannot exceed 2 GB, so they bundle a
+smaller model, and B3LYP (PySCF) is not available on Windows. The
+[user guide](docs/USER_GUIDE.md#installing) covers all of this step by step.
 
 ## Build from source
 
@@ -75,7 +79,10 @@ compute/.venv/bin/python scripts/build_appimage.py
 MOPAC, Vina, llama.cpp (built from source), the model and the report fonts. To regenerate the data
 sets, run `scripts/build_elements.py` (needs the `data` dependency group) and
 `scripts/build_library.py`. Installers for all three operating systems are built by
-`.github/workflows/release.yml`.
+`.github/workflows/release.yml`; pushing a tag such as `v1.0.0` also publishes them as a GitHub
+release (`scripts/release_assets.py` splits files of 2 GB or more and writes the release notes).
+On Windows, llama.cpp is built with clang and Ninja (`choco install ninja llvm`) and needs the
+Vulkan SDK; on macOS, set `MACOSX_DEPLOYMENT_TARGET=14.0`.
 
 ### Run in development
 

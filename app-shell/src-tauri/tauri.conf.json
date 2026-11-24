@@ -60,6 +60,6 @@
       "webviewInstallMode": { "type": "offlineInstaller", "silent": true },
       "nsis": { "installMode": "currentUser" }
     },
-    "macOS": { "minimumSystemVersion": "11.0" }
+    "macOS": { "minimumSystemVersion": "14.0", "signingIdentity": "-" }
   }
 }

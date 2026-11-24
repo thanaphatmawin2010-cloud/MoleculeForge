@@ -210,17 +210,24 @@ def fetch_conda_engine(plat: str, name: str) -> None:
     if marker.exists() and any(p.name.startswith(f"{name}-") for p in marker.iterdir()):
         log(f"{name} prefix already present")
     else:
+        pins = LOCK.get("conda_pins", {}).get("specs", [])
         cmd = [str(exe), "create", "--yes", "--prefix", str(prefix), "--override-channels",
-               "--channel", spec["channel"], spec["conda_spec"], "--platform", CONDA_SUBDIR[plat]]
+               "--channel", spec["channel"], spec["conda_spec"], *pins, "--platform", CONDA_SUBDIR[plat]]
         log(f"creating {name} prefix: " + " ".join(cmd[1:]))
         subprocess.run(cmd, check=True, env=env)
-        # Trim headers, static archives and docs that are never used at runtime.
-        for sub in ("include", "share/man", "share/doc", "share/info", "conda-meta/history"):
-            target = prefix / sub
-            if target.is_dir():
-                shutil.rmtree(target, ignore_errors=True)
-        for static in prefix.rglob("*.a"):
-            static.unlink()
+        # Trim headers, static archives, import libraries and docs that are never used at runtime
+        # (Windows prefixes keep them under Library/).
+        for base in (prefix, prefix / "Library"):
+            for sub in ("include", "lib/cmake", "lib/pkgconfig", "share/man", "share/doc", "share/info"):
+                target = base / sub
+                if target.is_dir():
+                    shutil.rmtree(target, ignore_errors=True)
+        history = prefix / "conda-meta" / "history"
+        if history.is_file():
+            history.unlink()
+        for pattern in ("*.a", "*.lib") if plat.startswith("windows") else ("*.a",):
+            for static in prefix.rglob(pattern):
+                static.unlink()
     bundle_conda_licences(exe, prefix, env)
 
 
@@ -278,9 +285,12 @@ def fetch_llama(plat: str, jobs: int) -> None:
     src = ROOT / "engines" / ".src" / f"llama.cpp-{spec['tag']}"
     if not src.exists():
         src.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["git", "clone", "--depth", "1", "--branch", spec["tag"], spec["repo"], str(src)], check=True)
-    build = src / "build"
-    args = ["cmake", "-S", str(src), "-B", str(build), *spec["cmake_common"], *spec["cmake_gpu"].get(plat, [])]
+        subprocess.run(["git", "-c", "core.longpaths=true", "clone", "--depth", "1", "--branch", spec["tag"],
+                        spec["repo"], str(src)], check=True)
+    # MF_LLAMA_BUILD_DIR puts the build tree on a short path (Windows MSBuild paths are limited).
+    build = Path(os.environ.get("MF_LLAMA_BUILD_DIR") or src / "build")
+    extra = [a.replace("{src}", src.as_posix()) for a in spec["cmake_platform"].get(plat, [])]
+    args = ["cmake", "-S", str(src), "-B", str(build), *spec["cmake_common"], *extra]
     if os.environ.get("MF_LLAMA_CPU_ONLY") == "1":
         args = [a for a in args if "VULKAN" not in a and "METAL=ON" not in a]
     log("configuring llama.cpp: " + " ".join(args[1:]))
@@ -305,7 +315,38 @@ def fetch_llama(plat: str, jobs: int) -> None:
             shutil.copy2(lib, target, follow_symlinks=False)
     if not server.exists():
         raise SystemExit("llama-server binary not produced")
+    if plat.startswith("windows"):
+        copied += copy_vc_runtime(out)
     log(f"llama.cpp built ({copied} files copied to {out})")
+
+
+def copy_vc_runtime(dest: Path) -> int:
+    """Put the Visual C++ runtime (and its OpenMP library) next to binaries built with MSVC.
+
+    llama-server and the ggml back-ends link vcruntime140, msvcp140 and vcomp140 dynamically. These
+    are Microsoft's redistributable files, deployed app-locally from the same Visual Studio
+    installation that compiled the binaries, so the app runs on PCs without the VC++ redistributable.
+    """
+    program_files = os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
+    vswhere = Path(program_files) / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
+    install = subprocess.run([str(vswhere), "-latest", "-products", "*", "-requires",
+                              "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath"],
+                             capture_output=True, text=True, check=True).stdout.strip()
+
+    def version_key(path: Path) -> tuple[int, ...]:
+        parts = path.parent.name.split(".")
+        return tuple(int(p) for p in parts) if all(p.isdigit() for p in parts) else (0,)
+
+    crt_dirs = sorted((Path(install) / "VC" / "Redist" / "MSVC").glob("*/x64/Microsoft.VC14*.CRT"),
+                      key=lambda p: version_key(p.parent))
+    if not crt_dirs:
+        raise SystemExit(f"no Visual C++ redistributable found under {install}")
+    crt = crt_dirs[-1]
+    dlls = [*crt.glob("*.dll"), *crt.parent.glob("Microsoft.VC14*.OpenMP/*.dll")]
+    for dll in dlls:
+        shutil.copy2(dll, dest / dll.name)
+    log(f"Visual C++ runtime {crt.parent.parent.name}: {', '.join(sorted(d.name for d in dlls))}")
+    return len(dlls)
 
 
 def write_manifest(plat: str) -> None:

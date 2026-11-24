@@ -5,6 +5,12 @@
     "license": "BSD-3-Clause",
     "source": "https://conda.anaconda.org/conda-forge/{subdir}/micromamba-2.10.0-0.tar.bz2"
   },
+  "conda_pins": {
+    "$comment": "Applied to every conda-built engine. conda-forge defaults to Intel MKL on Windows (about 700 MB per engine, which would push the Windows installers past their 2 GB limit); Linux and macOS already resolve to OpenBLAS.",
+    "specs": [
+      "libblas=*=*openblas"
+    ]
+  },
   "xtb": {
     "version": "6.8.0",
     "license": "LGPL-3.0-or-later",
@@ -45,18 +51,37 @@
       "-DGGML_NATIVE=OFF",
       "-DBUILD_SHARED_LIBS=ON"
     ],
-    "cmake_gpu": {
+    "cmake_platform": {
+      "$comment": "Added after cmake_common (later -D values win). Windows and macOS follow llama.cpp's own CI and release builds: clang with Ninja on Windows (MSVC is not what upstream tests the CPU variants with), and on macOS one CPU back-end linked directly, with an @loader_path rpath so the libraries are found next to llama-server. {src} is the llama.cpp source directory.",
       "linux-x64": [
         "-DGGML_VULKAN=ON"
       ],
       "windows-x64": [
-        "-DGGML_VULKAN=ON"
+        "-G",
+        "Ninja Multi-Config",
+        "-DCMAKE_TOOLCHAIN_FILE={src}/cmake/x64-windows-llvm.cmake",
+        "-DGGML_VULKAN=ON",
+        "-DGGML_OPENMP=OFF"
       ],
       "macos-arm64": [
-        "-DGGML_METAL=ON"
+        "-DGGML_BACKEND_DL=OFF",
+        "-DGGML_CPU_ALL_VARIANTS=OFF",
+        "-DGGML_METAL=ON",
+        "-DGGML_METAL_EMBED_LIBRARY=ON",
+        "-DCMAKE_INSTALL_RPATH=@loader_path",
+        "-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON"
       ],
       "macos-x64": [
-        "-DGGML_METAL=OFF"
+        "-DGGML_BACKEND_DL=OFF",
+        "-DGGML_CPU_ALL_VARIANTS=OFF",
+        "-DGGML_METAL=OFF",
+        "-DGGML_AVX=ON",
+        "-DGGML_AVX2=ON",
+        "-DGGML_FMA=ON",
+        "-DGGML_F16C=ON",
+        "-DGGML_BMI2=ON",
+        "-DCMAKE_INSTALL_RPATH=@loader_path",
+        "-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON"
       ]
     }
   },
