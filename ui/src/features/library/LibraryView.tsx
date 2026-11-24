@@ -13,6 +13,7 @@ import { errorText } from "@/lib/errors";
 import { openTextFile, saveFile } from "@/lib/files";
 import { formatNumber } from "@/lib/i18n";
 import type { Vec2 } from "@/lib/molecule";
+import { useIsPhone } from "@/lib/useMedia";
 import { useApp } from "@/state/app";
 import { openFromLibrary } from "../canvas/io";
 import { MoleculeThumbnail } from "./MoleculeThumbnail";
@@ -94,6 +95,7 @@ type SortKey = (typeof SORT_KEYS)[number];
 
 export function LibraryView() {
   const { t } = useTranslation();
+  const phone = useIsPhone();
   const pushToast = useApp((s) => s.pushToast);
   const [categories, setCategories] = useState<Category[]>([]);
   const [category, setCategory] = useState<string | null>(null);
@@ -145,13 +147,13 @@ export function LibraryView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
-      <div className="mx-auto w-full max-w-[1400px] space-y-6 p-6">
+      <div className="mx-auto w-full max-w-[1400px] space-y-6 p-6 max-md:space-y-4 max-md:p-3">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">{t("library.title")}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink max-md:text-xl">{t("library.title")}</h1>
             <p className="mt-1 text-sm text-ink-3">{t("library.subtitle")}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" icon={<Upload className="size-4" />} onClick={() => void importFile()}>
               {t("library.import")}
             </Button>
@@ -165,6 +167,27 @@ export function LibraryView() {
         </header>
 
         <section aria-label={t("library.families")}>
+          {phone ? (
+            // Phones: the families as one row of chips that scrolls sideways.
+            <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1" role="group" aria-label={t("library.families")}>
+              {grid.map((c) => {
+                const fam = FAMILY_CLASS[LIBRARY_FAMILY[c.family] ?? "unknown"]!;
+                const active = category === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    aria-pressed={active}
+                    onClick={() => setCategory(active ? null : c.id)}
+                    data-testid={`family-${c.id}`}
+                    className={cx("flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold", fam.tile, fam.ink, active ? "ring-2 ring-accent" : "shadow-1")}
+                  >
+                    {t(`library.category.${c.id}`)}
+                    <span className="font-mono font-normal">{c.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
           <div className="grid grid-cols-5 gap-2" role="group" aria-label={t("library.families")}>
             {grid.map((c) => {
               const fam = FAMILY_CLASS[LIBRARY_FAMILY[c.family] ?? "unknown"]!;
@@ -191,14 +214,15 @@ export function LibraryView() {
               );
             })}
           </div>
+          )}
         </section>
 
         <section className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+            <div className="relative max-md:w-full">
               <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
               <input
-                className={cx(inputClass, "w-72 ps-8")}
+                className={cx(inputClass, "w-72 ps-8 max-md:w-full")}
                 placeholder={t("library.search")}
                 aria-label={t("library.search")}
                 value={query}
@@ -249,7 +273,7 @@ export function LibraryView() {
               <EmptyState icon={<FolderOpen className="size-5" />} title={t("library.emptyTitle")} body={t("library.emptyBody")} />
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 max-md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] max-md:gap-2">
               {items.map((item) => (
                 <Card key={item.id} item={item} onChanged={refresh} />
               ))}

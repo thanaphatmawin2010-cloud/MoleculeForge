@@ -325,7 +325,9 @@
     "finish": "Finish",
     "skip": "Skip",
     "step1": "Press O, then click the canvas to place an oxygen atom.",
+    "step1Touch": "Tap O in the toolbar, then tap the canvas to place an oxygen atom.",
     "step2": "Press H, then drag outward from the oxygen twice to add two hydrogens.",
+    "step2Touch": "Tap H, then drag outward from the oxygen twice to add two hydrogens.",
     "step3": "That's water. Open Simulate to compute its properties.",
     "title": "Build your first molecule: water"
   },

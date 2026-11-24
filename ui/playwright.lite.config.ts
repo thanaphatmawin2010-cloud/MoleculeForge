@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 /**
  * End-to-end tests for MoleculeForge Lite (the web trial; the Android app wraps the same build).
@@ -17,10 +17,14 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: `http://127.0.0.1:${port}/MoleculeForge/`,
-    viewport: { width: 1440, height: 900 },
     trace: "off",
     launchOptions: chromium ? { executablePath: chromium } : {},
   },
+  projects: [
+    { name: "desktop", testIgnore: /phone\.spec\.ts/, use: { viewport: { width: 1440, height: 900 } } },
+    // Phone layout and touch input; the Android app's WebView renders the same build.
+    { name: "phone", testMatch: /phone\.spec\.ts/, use: { ...devices["Pixel 7"] } },
+  ],
   webServer: {
     command: `pnpm exec vite preview --mode lite --outDir dist-lite --base /MoleculeForge/ --host 127.0.0.1 --port ${port} --strictPort`,
     url: `http://127.0.0.1:${port}/MoleculeForge/`,

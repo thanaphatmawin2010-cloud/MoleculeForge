@@ -49,9 +49,10 @@ function SidecarStatus() {
     label = t(`status.${sidecar}`);
   }
   return (
-    <Badge tone={tone} data-testid="engine-status" title={sidecar === "error" && error ? error : undefined}>
+    <Badge tone={tone} data-testid="engine-status" title={sidecar === "error" && error ? error : label}>
       <span className={cx("size-1.5 rounded-full", sidecar === "ready" ? "bg-success" : sidecar === "error" ? "bg-danger" : "animate-pulse bg-ink-3")} />
-      {label}
+      {/* Phones show the dot; the label stays for screen readers. */}
+      <span className="max-md:sr-only">{label}</span>
     </Badge>
   );
 }
@@ -91,9 +92,13 @@ export function App() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-full">
-        <nav className="flex w-[68px] shrink-0 flex-col items-center gap-1 border-e border-line bg-surface-1 py-3" aria-label={t("nav.label")}>
-          <div className="mb-3">
+      {/* Desktop: a navigation rail on the left. Phones: a tab bar along the bottom. */}
+      <div className="flex h-full max-md:flex-col">
+        <nav
+          className="flex w-[68px] shrink-0 flex-col items-center gap-1 border-e border-line bg-surface-1 py-3 max-md:order-last max-md:h-[calc(3.5rem+env(safe-area-inset-bottom))] max-md:w-full max-md:flex-row max-md:items-stretch max-md:gap-0 max-md:border-e-0 max-md:border-t max-md:px-1 max-md:py-0 max-md:pb-[env(safe-area-inset-bottom)]"
+          aria-label={t("nav.label")}
+        >
+          <div className="mb-3 max-md:hidden">
             <Logo className="size-9" />
           </div>
           {NAV.map((item) => (
@@ -103,17 +108,22 @@ export function App() {
               aria-current={view === item.id ? "page" : undefined}
               data-testid={`nav-${item.id}`}
               className={cx(
-                "group relative flex w-14 flex-col items-center gap-1 rounded-lg py-2 text-2xs font-medium transition-colors duration-1",
+                "group relative flex w-14 flex-col items-center gap-1 rounded-lg py-2 text-2xs font-medium transition-colors duration-1 max-md:w-auto max-md:flex-1 max-md:justify-center max-md:rounded-none max-md:py-1",
                 view === item.id ? "bg-accent-soft text-accent" : "text-ink-3 hover:bg-surface-3 hover:text-ink",
               )}
               title={`${t(`nav.${item.id}`)} (Ctrl+${item.key})`}
             >
-              {view === item.id && <motion.span layoutId="nav-indicator" className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-accent" />}
+              {view === item.id && (
+                <motion.span
+                  layoutId="nav-indicator"
+                  className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-accent max-md:inset-x-4 max-md:inset-y-auto max-md:top-0 max-md:h-0.5 max-md:w-auto"
+                />
+              )}
               {item.icon}
               <span>{t(`nav.${item.id}`)}</span>
             </button>
           ))}
-          <div className="mt-auto flex flex-col items-center gap-1">
+          <div className="mt-auto flex flex-col items-center gap-1 max-md:mt-0 max-md:flex-1 max-md:justify-center">
             <IconButton label={t("nav.assistant")} shortcut="Ctrl J" tooltipSide="right" onClick={() => useApp.getState().toggleAssistant()} data-testid="nav-assistant">
               <Bot className="size-5" />
             </IconButton>
@@ -121,19 +131,19 @@ export function App() {
         </nav>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface-1 px-4">
-            <h1 className="text-sm font-semibold text-ink">
-              {t("app.name")}
-              <span className="ms-2 font-normal text-ink-3">
+          <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface-1 px-4 max-md:h-[calc(3rem+env(safe-area-inset-top))] max-md:gap-2 max-md:px-3 max-md:pt-[env(safe-area-inset-top)]">
+            <h1 className="min-w-0 truncate text-sm font-semibold text-ink">
+              <span className="max-md:hidden">{t("app.name")}</span>
+              <span className="ms-2 font-normal text-ink-3 max-md:ms-0 max-md:font-semibold max-md:text-ink">
                 {t(`nav.${view}`)}
-                {view === "build" && ` · ${docName || t("inspector.untitled")}${dirty ? " •" : ""}`}
+                {view === "build" && <span className="max-md:font-normal max-md:text-ink-3">{` · ${docName || t("inspector.untitled")}${dirty ? " •" : ""}`}</span>}
               </span>
             </h1>
             <div className="ms-auto flex items-center gap-2">
               <SidecarStatus />
               <button
                 onClick={() => useApp.getState().setPaletteOpen(true)}
-                className="flex h-8 items-center gap-2 rounded bg-surface-2 px-2.5 text-xs text-ink-3 hover:text-ink hairline"
+                className="flex h-8 items-center gap-2 rounded bg-surface-2 px-2.5 text-xs text-ink-3 hover:text-ink hairline max-md:hidden"
                 data-testid="open-palette"
               >
                 <Command className="size-3.5" />

@@ -55,17 +55,17 @@ export function PeriodicTableView() {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-auto p-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-auto p-6 max-md:p-3">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">{t("periodic.title")}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink max-md:text-xl">{t("periodic.title")}</h1>
             <p className="mt-1 text-sm text-ink-3">{t("periodic.subtitle", { count: elements.length })}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+            <div className="relative max-md:w-full">
               <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
               <input
-                className={cx(inputClass, "w-56 ps-8")}
+                className={cx(inputClass, "w-56 ps-8 max-md:w-full")}
                 placeholder={t("periodic.search")}
                 aria-label={t("periodic.search")}
                 value={query}
@@ -105,8 +105,11 @@ export function PeriodicTableView() {
           </div>
         </header>
 
-        <div className="min-h-[520px] flex-1">
-          <PeriodicGrid elements={elements} selected={selected?.Z ?? null} highlight={highlight} heat={heat} onSelect={setSelected} />
+        {/* Phones scroll the full-size table sideways rather than shrinking 18 columns to fit. */}
+        <div className="min-h-[520px] flex-1 max-md:-mx-3 max-md:min-h-0 max-md:flex-none max-md:overflow-x-auto max-md:px-3 max-md:pb-1">
+          <div className="h-full max-md:w-[780px]">
+            <PeriodicGrid elements={elements} selected={selected?.Z ?? null} highlight={highlight} heat={heat} onSelect={setSelected} />
+          </div>
         </div>
 
         <footer className="flex flex-wrap items-center gap-x-4 gap-y-2" aria-label={t("periodic.legend")}>

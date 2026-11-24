@@ -100,7 +100,7 @@ function ToastCard({ toast }: { toast: Toast }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, x: 24, transition: { duration: 0.15 } }}
       transition={{ type: "spring", stiffness: 500, damping: 36 }}
-      className="pointer-events-auto w-[360px] rounded-lg bg-surface-1 p-3 shadow-3 hairline"
+      className="pointer-events-auto w-[360px] rounded-lg bg-surface-1 p-3 shadow-3 hairline max-md:w-full"
       role={toast.tone === "danger" ? "alert" : "status"}
       data-testid={`toast-${toast.tone}`}
     >
@@ -148,7 +148,7 @@ function ToastCard({ toast }: { toast: Toast }) {
 export function Toaster() {
   const toasts = useApp((s) => s.toasts);
   return (
-    <ol className="pointer-events-none fixed bottom-4 end-4 z-50 flex flex-col gap-2" aria-live="polite">
+    <ol className="pointer-events-none fixed bottom-4 end-4 z-50 flex flex-col gap-2 max-md:inset-x-3 max-md:bottom-[calc(4.25rem+env(safe-area-inset-bottom))]" aria-live="polite">
       <AnimatePresence initial={false}>
         {toasts.map((toast) => (
           <ToastCard key={toast.id} toast={toast} />

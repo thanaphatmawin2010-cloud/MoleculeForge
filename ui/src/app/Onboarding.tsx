@@ -4,6 +4,7 @@ import { Droplets } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/design-system/primitives";
+import { useMediaQuery } from "@/lib/useMedia";
 import { useApp } from "@/state/app";
 import { useEditor } from "@/state/editor";
 
@@ -14,6 +15,8 @@ export function Onboarding() {
   const sidecar = useApp((s) => s.sidecar);
   const molecule = useEditor((s) => s.doc.molecule);
   const [dismissed, setDismissed] = useState(false);
+  // On touch screens the steps name the toolbar buttons instead of keyboard shortcuts.
+  const touch = useMediaQuery("(pointer: coarse)");
 
   const step = useMemo(() => {
     const hasO = molecule.atoms.some((a) => a.el === "O");
@@ -41,7 +44,7 @@ export function Onboarding() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 16 }}
-          className="fixed bottom-6 start-[92px] z-30 w-[340px] rounded-xl bg-surface-1 p-4 shadow-3 hairline"
+          className="fixed bottom-6 start-[92px] z-30 w-[340px] rounded-xl bg-surface-1 p-4 shadow-3 hairline max-md:inset-x-3 max-md:bottom-[calc(4.25rem+env(safe-area-inset-bottom))] max-md:w-auto"
           role="dialog"
           aria-label={t("onboarding.title")}
           data-testid="onboarding"
@@ -58,7 +61,7 @@ export function Onboarding() {
                 <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-2xs font-semibold ${i < step ? "bg-success text-surface-1" : i === step ? "bg-accent text-accent-on" : "bg-surface-3 text-ink-3"}`}>
                   {i < step ? "✓" : i + 1}
                 </span>
-                <span className={i === step ? "text-ink" : "text-ink-3"}>{t(`onboarding.step${i + 1}`)}</span>
+                <span className={i === step ? "text-ink" : "text-ink-3"}>{t(touch && i < 2 ? `onboarding.step${i + 1}Touch` : `onboarding.step${i + 1}`)}</span>
               </li>
             ))}
           </ol>

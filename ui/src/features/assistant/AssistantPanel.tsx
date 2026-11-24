@@ -161,7 +161,7 @@ export function AssistantPanel() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 32, opacity: 0 }}
           transition={{ type: "spring", stiffness: 380, damping: 36 }}
-          className="flex w-[420px] shrink-0 flex-col border-s border-line bg-surface-1"
+          className="flex w-[420px] shrink-0 flex-col border-s border-line bg-surface-1 max-md:fixed max-md:inset-0 max-md:z-40 max-md:w-full max-md:border-s-0 max-md:pb-[env(safe-area-inset-bottom)] max-md:pt-[env(safe-area-inset-top)]"
           aria-label={t("assistant.title")}
           data-testid="assistant-panel"
         >

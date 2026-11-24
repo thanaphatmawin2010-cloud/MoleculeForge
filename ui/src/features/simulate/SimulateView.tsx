@@ -182,8 +182,8 @@ export function SimulateView() {
   const desktopOnlyJob = IS_LITE && (job === "md" || job === "dock");
 
   return (
-    <div className="flex h-full min-h-0">
-      <aside className="flex w-[320px] shrink-0 flex-col gap-4 overflow-y-auto border-e border-line bg-surface-1 p-4">
+    <div className="flex h-full min-h-0 max-md:flex-col max-md:overflow-y-auto">
+      <aside className="flex w-[320px] shrink-0 flex-col gap-4 overflow-y-auto border-e border-line bg-surface-1 p-4 max-md:w-full max-md:overflow-visible max-md:border-b max-md:border-e-0 max-md:p-3">
         <div>
           <h1 className="text-lg font-semibold text-ink">{t("simulate.title")}</h1>
           <p className="mt-0.5 text-xs text-ink-3">
@@ -277,8 +277,8 @@ export function SimulateView() {
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="grid gap-4 p-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="min-w-0 flex-1 overflow-y-auto max-md:flex-none max-md:overflow-visible">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 p-5 max-md:gap-3 max-md:p-3 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="space-y-4">
             {!result && !running && (
               <Panel className="p-8">
@@ -489,7 +489,7 @@ export function SimulateView() {
           <div className="space-y-4 xl:sticky xl:top-5 xl:self-start">
             <Panel className="overflow-hidden">
               <PanelHeader title={running ? t("simulate.live") : t("simulate.structure")} subtitle={mode !== null && freq ? t("results.animatingMode", { freq: freq[mode]?.toFixed(1) }) : undefined} />
-              <Viewer3D className="h-[380px]" molecule={shown} vibration={vibration} testId="sim-viewer" fitKey={`${shown.id}:${shown.atoms.length}`} />
+              <Viewer3D className="h-[380px] max-md:h-[300px]" molecule={shown} vibration={vibration} testId="sim-viewer" fitKey={`${shown.id}:${shown.atoms.length}`} />
             </Panel>
           </div>
         </div>

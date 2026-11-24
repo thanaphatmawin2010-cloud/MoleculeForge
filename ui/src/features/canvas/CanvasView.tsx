@@ -16,6 +16,7 @@ import {
   Square,
   Undo2,
   Wand2,
+  X,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,6 +28,7 @@ import { api } from "@/ipc/api";
 import type { BondOrderT, Molecule, PropertyValue } from "@/ipc/schema";
 import { ELEMENT_KEYS, QUICK_ELEMENTS, elementInk } from "@/lib/chemistry";
 import { angle, dihedral, distance, formulaOf, removeAtoms, removeBonds, updateAtom } from "@/lib/molecule";
+import { useIsPhone } from "@/lib/useMedia";
 import { useApp } from "@/state/app";
 import { type Tool, useEditor } from "@/state/editor";
 import { issueAtoms, useValidation } from "@/state/validation";
@@ -74,6 +76,10 @@ export function CanvasView() {
   const hybridization = useValidation((s) => s.hybridization);
   const implicitH = useValidation((s) => s.implicitH);
   const [layout, setLayout] = useState<Layout>("split");
+  // Phones show one pane at a time and the inspector as a bottom sheet.
+  const phone = useIsPhone();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const shown: Layout = phone && layout === "split" ? "2d" : layout;
   const [renderStyle, setRenderStyle] = useState<RenderStyle>("ball-and-stick");
   const [repairOpen, setRepairOpen] = useState(false);
   // Descriptors are tagged with the exact structure they describe and never shown for another one.
@@ -198,16 +204,18 @@ export function CanvasView() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Top toolbar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface-1 px-3 py-2" role="toolbar" aria-label={t("canvas.toolbar")}>
-        <div className="flex items-center gap-0.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface-1 px-3 py-2 max-md:gap-1 max-md:px-2 max-md:py-1.5" role="toolbar" aria-label={t("canvas.toolbar")}>
+        {/* Desktop: these groups sit in the wrapping toolbar (display: contents). Phones: one row that scrolls sideways. */}
+        <div className="flex items-center gap-2 md:contents max-md:-mx-2 max-md:w-[calc(100%+1rem)] max-md:overflow-x-auto max-md:px-2 max-md:pb-0.5">
+        <div className="flex shrink-0 items-center gap-0.5">
           {tools.map((item) => (
             <IconButton key={item.id} label={item.label} shortcut={item.key} active={tool === item.id} onClick={() => useEditor.getState().setTool(item.id)} data-testid={`tool-${item.id}`}>
               {item.icon}
             </IconButton>
           ))}
         </div>
-        <div className="mx-1 h-6 w-px bg-line" />
-        <div className="flex items-center gap-0.5" aria-label={t("canvas.elements")}>
+        <div className="mx-1 h-6 w-px shrink-0 bg-line" />
+        <div className="flex shrink-0 items-center gap-0.5" aria-label={t("canvas.elements")}>
           {QUICK_ELEMENTS.map((el) => (
             <Tooltip key={el} label={t(`elements:element.${el}`)} shortcut={Object.entries(ELEMENT_KEYS).find(([, v]) => v === el)?.[0].toUpperCase()}>
               <button
@@ -227,15 +235,17 @@ export function CanvasView() {
           ))}
           <ElementPicker onPick={(el) => useEditor.getState().setElement(el)} />
         </div>
-        <div className="mx-1 h-6 w-px bg-line" />
+        <div className="mx-1 h-6 w-px shrink-0 bg-line" />
+        <div className="shrink-0">
         <Segmented
           label={t("canvas.bondOrder")}
           value={bondOrder}
           onChange={(v) => useEditor.getState().setBondOrder(v)}
           options={bondOrders.map((b) => ({ value: b.value, label: <span className="font-mono text-sm">{b.label}</span>, title: t(`bond.${b.value}`) }))}
         />
-        <div className="mx-1 h-6 w-px bg-line" />
-        <div className="flex items-center gap-0.5">
+        </div>
+        <div className="mx-1 h-6 w-px shrink-0 bg-line" />
+        <div className="flex shrink-0 items-center gap-0.5">
           {RING_TEMPLATES.map((tpl) => (
             <IconButton
               key={tpl.key}
@@ -252,7 +262,8 @@ export function CanvasView() {
             </IconButton>
           ))}
         </div>
-        <div className="ms-auto flex items-center gap-1">
+        </div>
+        <div className="ms-auto flex items-center gap-1 max-md:ms-0 max-md:w-full">
           <IconButton label={t("action.undo")} shortcut="Ctrl Z" disabled={!canUndo} onClick={() => useEditor.getState().undo()}>
             <Undo2 className="size-4" />
           </IconButton>
@@ -265,15 +276,33 @@ export function CanvasView() {
           <IconButton label={t("canvas.addHydrogens")} shortcut="Shift H" onClick={() => void addHydrogens()} disabled={m.atoms.length === 0}>
             <span className="font-mono text-sm font-semibold">+H</span>
           </IconButton>
+          {phone && (
+            <button
+              type="button"
+              onClick={() => setSheetOpen(true)}
+              aria-expanded={sheetOpen}
+              className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 text-start hover:bg-surface-3"
+              data-testid="inspector-toggle"
+            >
+              <span className="sr-only">{t("inspector.title")}: </span>
+              <Badge tone={statusTone} className="min-w-0 shrink">
+                <span className="truncate">{t(`validation.status.${status}`)}</span>
+              </Badge>
+              <span className="truncate text-xs text-ink-2" data-testid="phone-formula">
+                {m.atoms.length > 0 && <Formula value={(quick?.formula?.value as string) ?? formulaOf(m, implicitH)} />}
+              </span>
+            </button>
+          )}
           <Button
             variant="primary"
             icon={<Sparkles className="size-4" />}
             onClick={() => setRepairOpen(true)}
             disabled={m.atoms.length === 0}
+            className="max-md:shrink-0"
             data-testid="repair-button"
           >
             {t("canvas.repair")}
-            <Kbd tone="inverse">⇧R</Kbd>
+            {!phone && <Kbd tone="inverse">⇧R</Kbd>}
           </Button>
         </div>
       </div>
@@ -281,8 +310,8 @@ export function CanvasView() {
       <div className="flex min-h-0 flex-1">
         {/* Panes */}
         <div className="relative flex min-w-0 flex-1">
-          {(layout === "split" || layout === "2d") && <Sketch2D className={cx("min-w-0 flex-1", layout === "split" && "border-e border-line")} />}
-          {(layout === "split" || layout === "3d") && (
+          {(shown === "split" || shown === "2d") && <Sketch2D className={cx("min-w-0 flex-1", shown === "split" && "border-e border-line")} />}
+          {(shown === "split" || shown === "3d") && (
             <div className="relative min-w-0 flex-1">
               <Viewer3D
                 className="size-full"
@@ -351,19 +380,36 @@ export function CanvasView() {
             <Segmented
               size="sm"
               label={t("canvas.layout")}
-              value={layout}
+              value={shown}
               onChange={setLayout}
               options={[
-                { value: "2d", label: <Square className="size-3.5" />, title: t("canvas.layout2d") },
-                { value: "split", label: <Columns2 className="size-3.5" />, title: t("canvas.layoutSplit") },
-                { value: "3d", label: <Box className="size-3.5" />, title: t("canvas.layout3d") },
+                { value: "2d" as Layout, label: <Square className="size-3.5" />, title: t("canvas.layout2d") },
+                ...(phone ? [] : [{ value: "split" as Layout, label: <Columns2 className="size-3.5" />, title: t("canvas.layoutSplit") }]),
+                { value: "3d" as Layout, label: <Box className="size-3.5" />, title: t("canvas.layout3d") },
               ]}
             />
           </div>
         </div>
 
-        {/* Inspector */}
-        <aside className="flex w-[300px] shrink-0 flex-col overflow-y-auto border-s border-line bg-surface-1" aria-label={t("inspector.title")}>
+        {/* Inspector: a side panel; on phones a bottom sheet above the tab bar. */}
+        {phone && sheetOpen && <div className="fixed inset-0 z-20 bg-ink/20" onClick={() => setSheetOpen(false)} aria-hidden />}
+        <aside
+          className={cx(
+            "flex w-[300px] shrink-0 flex-col overflow-y-auto border-s border-line bg-surface-1",
+            "max-md:fixed max-md:inset-x-0 max-md:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] max-md:z-30 max-md:max-h-[70vh] max-md:w-full max-md:rounded-t-xl max-md:border-s-0 max-md:border-t max-md:shadow-3",
+            phone && !sheetOpen && "hidden",
+          )}
+          aria-label={t("inspector.title")}
+          data-testid="inspector"
+        >
+          {phone && (
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface-1 px-4 py-2">
+              <p className="text-sm font-semibold text-ink">{t("inspector.title")}</p>
+              <IconButton size="sm" label={t("action.close")} onClick={() => setSheetOpen(false)} data-testid="inspector-close">
+                <X className="size-4" />
+              </IconButton>
+            </div>
+          )}
           <section className="border-b border-line p-4">
             <label htmlFor="molecule-name" className="text-2xs font-semibold uppercase tracking-wide text-ink-3">
               {t("inspector.name")}

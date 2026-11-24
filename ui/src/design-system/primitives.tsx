@@ -131,7 +131,7 @@ export function Panel({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
 
 export function PanelHeader({ title, subtitle, actions, className }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; className?: string }) {
   return (
-    <div className={cx("flex items-start justify-between gap-3 border-b border-line px-4 py-3", className)}>
+    <div className={cx("flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3", className)}>
       <div className="min-w-0">
         <h2 className="truncate text-sm font-semibold text-ink">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-ink-3">{subtitle}</p>}

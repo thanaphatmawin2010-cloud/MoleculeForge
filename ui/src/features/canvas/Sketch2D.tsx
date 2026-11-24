@@ -38,7 +38,14 @@ type Drag =
   | { kind: "pan"; startX: number; startY: number; view: View }
   | { kind: "bond"; from: number; to: Vec2 }
   | { kind: "move"; origin: Vec2; last: Vec2; atoms: Set<number>; start: Doc }
-  | { kind: "marquee"; origin: Vec2; to: Vec2 };
+  | { kind: "marquee"; origin: Vec2; to: Vec2 }
+  // Touch: an edit that runs when the finger lifts, unless a second finger turns it into a pinch.
+  | { kind: "tap"; run: () => void; x: number; y: number }
+  // Touch: two fingers pan and zoom.
+  | { kind: "pinch"; view: View; mid: [number, number]; dist: number };
+
+/** A finger that travels further than this (CSS px) before lifting is not a tap. */
+const TAP_SLOP = 10;
 
 const HIT_ATOM = 0.42;
 const HIT_BOND = 0.26;
@@ -68,6 +75,7 @@ export function Sketch2D({ className }: { className?: string }) {
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 46 });
   const [drag, setDrag] = useState<Drag | null>(null);
   const [hover, setHover] = useState<{ atom?: number; bond?: number }>({});
+  const touches = useRef(new Map<number, { x: number; y: number }>());
   const fittedFor = useRef<string | null>(null);
 
   const m = doc.molecule;
@@ -181,6 +189,20 @@ export function Sketch2D({ className }: { className?: string }) {
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     svgRef.current?.setPointerCapture(e.pointerId);
+    const touch = e.pointerType === "touch";
+    if (touch) {
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.current.size === 2) {
+        // A second finger pans and zooms; whatever the first finger started is dropped.
+        if (drag?.kind === "move") useEditor.getState().preview(drag.start);
+        const [a, b] = [...touches.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
+        setDrag({ kind: "pinch", view, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], dist: Math.hypot(a.x - b.x, a.y - b.y) || 1 });
+        return;
+      }
+      if (touches.current.size > 2) return;
+    }
+    // Mouse and pen edit at once; a finger edits when it lifts (see the "tap" drag).
+    const act = (run: () => void) => (touch ? setDrag({ kind: "tap", run, x: e.clientX, y: e.clientY }) : run());
     const p = toWorld(e.clientX, e.clientY);
     if (e.button === 1 || e.button === 2 || (e.button === 0 && e.altKey)) {
       setDrag({ kind: "pan", startX: e.clientX, startY: e.clientY, view });
@@ -214,9 +236,9 @@ export function Sketch2D({ className }: { className?: string }) {
     if (tool === "erase") {
       if (atom !== undefined) {
         const { doc: next } = removeAtoms(doc, new Set(withHidden([atom])));
-        commit(t("history.deleteAtom"), next, { atoms: [], bonds: [] });
+        act(() => commit(t("history.deleteAtom"), next, { atoms: [], bonds: [] }));
       } else if (bond !== undefined) {
-        commit(t("history.deleteBond"), removeBonds(doc, new Set([bond])), { atoms: [], bonds: [] });
+        act(() => commit(t("history.deleteBond"), removeBonds(doc, new Set([bond])), { atoms: [], bonds: [] }));
       }
       return;
     }
@@ -224,7 +246,7 @@ export function Sketch2D({ className }: { className?: string }) {
       if (atom !== undefined) {
         const delta = e.shiftKey ? -1 : 1;
         const charge = Math.max(-4, Math.min(4, m.atoms[atom]!.charge + delta));
-        commit(t("history.setCharge"), updateAtom(doc, atom, { charge }), { atoms: [atom], bonds: [] });
+        act(() => commit(t("history.setCharge"), updateAtom(doc, atom, { charge }), { atoms: [atom], bonds: [] }));
       }
       return;
     }
@@ -236,16 +258,35 @@ export function Sketch2D({ className }: { className?: string }) {
     if (bond !== undefined) {
       const current = m.bonds[bond]!;
       const order = tool === "bond" && current.order !== bondOrder ? bondOrder : NEXT_ORDER[current.order];
-      commit(t("history.bondOrder"), setBondOrder(doc, bond, order).doc, { atoms: [current.a, current.b], bonds: [bond] }, true);
+      act(() => commit(t("history.bondOrder"), setBondOrder(doc, bond, order).doc, { atoms: [current.a, current.b], bonds: [bond] }, true));
       return;
     }
     if (tool === "atom" || tool === "bond") {
       const { doc: next, index } = addAtom(doc, tool === "atom" ? element : "C", p);
-      commit(t("history.addAtom"), next, { atoms: [index], bonds: [] });
+      act(() => commit(t("history.addAtom"), next, { atoms: [index], bonds: [] }));
     }
   };
 
   const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.pointerType === "touch" && touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (drag?.kind === "pinch") {
+      const points = [...touches.current.values()];
+      if (points.length < 2) return;
+      const [a, b] = points as [{ x: number; y: number }, { x: number; y: number }];
+      const rect = svgRef.current!.getBoundingClientRect();
+      const scale = Math.max(8, Math.min(160, (drag.view.scale * (Math.hypot(a.x - b.x, a.y - b.y) || 1)) / drag.dist));
+      // The point that was under the fingers stays under them.
+      const wx = (drag.mid[0] - rect.left - size.w / 2) / drag.view.scale + drag.view.cx;
+      const wy = (drag.mid[1] - rect.top - size.h / 2) / drag.view.scale + drag.view.cy;
+      const mx = (a.x + b.x) / 2;
+      const my = (a.y + b.y) / 2;
+      setView({ scale, cx: wx - (mx - rect.left - size.w / 2) / scale, cy: wy - (my - rect.top - size.h / 2) / scale });
+      return;
+    }
+    if (drag?.kind === "tap") {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > TAP_SLOP) setDrag(null);
+      return;
+    }
     const p = toWorld(e.clientX, e.clientY);
     if (!drag) {
       const atom = hitAtom(p);
@@ -271,9 +312,18 @@ export function Sketch2D({ className }: { className?: string }) {
 
   const onPointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
     svgRef.current?.releasePointerCapture(e.pointerId);
+    if (e.pointerType === "touch") touches.current.delete(e.pointerId);
+    if (drag?.kind === "pinch") {
+      if (touches.current.size === 0) setDrag(null);
+      return;
+    }
     const current = drag;
     setDrag(null);
     if (!current) return;
+    if (current.kind === "tap") {
+      current.run();
+      return;
+    }
     const p = toWorld(e.clientX, e.clientY);
     if (current.kind === "bond") {
       const from = current.from;
@@ -321,6 +371,13 @@ export function Sketch2D({ className }: { className?: string }) {
     }
   };
 
+  /** The browser took the pointer over (or it left the screen): nothing is committed. */
+  const onPointerCancel = (e: ReactPointerEvent<SVGSVGElement>) => {
+    touches.current.delete(e.pointerId);
+    if (drag?.kind === "move") useEditor.getState().preview(drag.start);
+    if (drag?.kind !== "pinch" || touches.current.size === 0) setDrag(null);
+  };
+
   const onWheel = (e: WheelEvent<SVGSVGElement>) => {
     const p = toWorld(e.clientX, e.clientY);
     const factor = Math.exp(-e.deltaY * 0.0015);
@@ -358,6 +415,7 @@ export function Sketch2D({ className }: { className?: string }) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onPointerLeave={() => setHover({})}
         onWheel={onWheel}
         onDragOver={(e) => {
