@@ -468,7 +468,7 @@ function lines(text: string): string[] {
 const LITE_ONLY_FORMATS = new Set(["xyz", "pdb", "inchi"]);
 
 export function parse(fmt: string, data: string, options: { charge?: number; embed3d?: boolean; name?: string } = {}): Molecule[] {
-  const text = data.replace(/^﻿/, "");
+  const text = data.replace(/^\uFEFF/, "");
   const embed = options.embed3d ?? true;
   const name = options.name ?? "";
   if (!text.trim()) throw new RpcFailure(CHEMISTRY_ERROR, "No input data", { code: "EMPTY_INPUT" });

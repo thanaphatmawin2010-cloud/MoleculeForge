@@ -78,7 +78,10 @@ def categorize(mol: Chem.Mol) -> str:
         return "ions"
     if zs & METALS:
         return "coordination"
-    if 6 not in zs or (zs <= {6, 8} and n_heavy <= 3 and not any(a.GetTotalNumHs() for a in heavy.GetAtoms() if a.GetAtomicNum() == 6)):
+    # Hydrogens counted on the full molecule: drawn molecules carry them as explicit atoms, which
+    # RemoveHs(sanitize=False) leaves uncounted (methanol would otherwise read as inorganic).
+    carbon_has_h = any(a.GetTotalNumHs(includeNeighbors=True) for a in mol.GetAtoms() if a.GetAtomicNum() == 6)
+    if 6 not in zs or (zs <= {6, 8} and n_heavy <= 3 and not carbon_has_h):
         return "inorganic"
     if _has(mol, "amino_acid") or _has(mol, "nucleobase"):
         return "biomolecules"

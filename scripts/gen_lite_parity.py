@@ -3,7 +3,7 @@
 
 Runs the desktop sidecar's own functions (validation with auto-fix, sanitisation, descriptors) on
 
-* every prebuilt library molecule,
+* every prebuilt library molecule (with its automatic category),
 * hand-written editing scenarios (valence, aromaticity, charges, radicals, clean-up groups, ...),
 * seeded random small structures that stress the valence rules,
 
@@ -24,7 +24,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "compute"))
 
-from mfcompute.chem import descriptors, validate  # noqa: E402
+from mfcompute.chem import convert, descriptors, validate  # noqa: E402
+from mfcompute.data.categorize import categorize  # noqa: E402
 from mfcompute.models import Molecule  # noqa: E402
 from mfcompute.rpc import RpcError  # noqa: E402
 
@@ -121,7 +122,7 @@ def random_cases(count: int, seed: int = 20261124) -> list[dict[str, Any]]:
     for k in range(count):
         n = rng.randint(2, 7)
         atoms: list[tuple[Any, ...]] = []
-        for i in range(n):
+        for _i in range(n):
             extra: dict[str, Any] = {}
             roll = rng.random()
             if roll < 0.12:
@@ -196,6 +197,7 @@ def main() -> int:
                          "formula": sanitized["molecule"].formula,
                          "hybridization": [a["hybridization"] for a in sanitized["atoms"]]},
             "descriptors": run_descriptors(mol),
+            "category": categorize(convert.to_rdkit(mol)),
         })
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")

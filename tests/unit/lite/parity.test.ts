@@ -8,11 +8,13 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Molecule } from "@/ipc/schema";
+import { categorize } from "@/lite/engine/categorize";
+import { annotate, toRDKitStrict } from "@/lite/engine/convert";
 import { compute } from "@/lite/engine/descriptors";
 import { setElements, type ElementsPayload } from "@/lite/engine/elements";
 import { RpcFailure } from "@/lite/engine/errors";
 import { loadOCL } from "@/lite/engine/ocl";
-import { loadRDKit } from "@/lite/engine/rdkit";
+import { loadRDKit, withMol } from "@/lite/engine/rdkit";
 import { sanitize, validate } from "@/lite/engine/validate";
 
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
@@ -39,6 +41,7 @@ interface LibraryCase {
   molecule: Molecule;
   sanitize: { valid: boolean; codes: string[]; smiles: string; inchikey: string; formula: string; hybridization: string[] };
   descriptors: Record<string, unknown> | null;
+  category: string;
 }
 
 const fixtures = JSON.parse(readFileSync(`${ROOT}tests/fixtures/lite-parity.json`, "utf8")) as { validation: ValidationCase[]; library: LibraryCase[] };
@@ -107,7 +110,7 @@ describe("validation matches the desktop engine", () => {
 
 const close = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
 
-describe("library molecules: sanitisation and descriptors match the desktop engine", () => {
+describe("library molecules: sanitisation, category and descriptors match the desktop engine", () => {
   for (const c of fixtures.library) {
     it(c.molecule.name, () => {
       const s = sanitize(c.molecule);
@@ -117,6 +120,7 @@ describe("library molecules: sanitisation and descriptors match the desktop engi
       expect(s.molecule.meta.inchikey).toBe(c.sanitize.inchikey);
       expect(s.molecule.formula).toBe(c.sanitize.formula);
       expect(s.atoms.map((a) => a.hybridization)).toEqual(c.sanitize.hybridization);
+      expect(withMol(toRDKitStrict(c.molecule), (rd) => categorize(annotate(c.molecule, rd), rd))).toBe(c.category);
       if (!c.descriptors) return;
       const d = compute(c.molecule);
       const want = c.descriptors;
