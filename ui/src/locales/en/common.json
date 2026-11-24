@@ -244,6 +244,13 @@
     "saved": "Saved to the library",
     "savedInto": "Filed under {category}.",
     "search": "Search name, formula or SMILES",
+    "sort": {
+      "default": "Built-in first",
+      "label": "Sort molecules",
+      "name": "Name",
+      "recent": "Recently saved",
+      "weight": "Molecular weight"
+    },
     "source": "Source",
     "sourceAll": "All",
     "sourcePrebuilt": "Built-in",

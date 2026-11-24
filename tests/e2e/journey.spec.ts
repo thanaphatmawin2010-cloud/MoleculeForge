@@ -87,8 +87,11 @@ test("a ring template dragged onto the sketch is inserted where it is dropped", 
   const sketch = page.getByTestId("sketch-2d");
   await page.getByTestId("template-benzene").dragTo(sketch, { targetPosition: { x: 180, y: 140 } });
   await expect(page.getByTestId("formula")).toHaveText("C6H6");
+  // 2D and 3D show one document: the 3D view follows the sketch.
+  await expect(page.getByRole("img", { name: "3D view of C6H6, 6 atoms" })).toBeVisible();
   await page.keyboard.press("Control+z");
   await expect(page.getByTestId("formula")).not.toHaveText("C6H6");
+  await expect(page.getByRole("img", { name: /3D view of C6H6/ })).toHaveCount(0);
 });
 
 test("periodic table: all elements, search, detail with units, heat map and trends", async ({ page }) => {
@@ -114,6 +117,18 @@ test("periodic table: all elements, search, detail with units, heat map and tren
   await expect(page.getByTestId("heat-property")).toBeVisible();
   const styled = await page.locator('[data-testid^="element-tile-"]').evaluateAll((tiles) => tiles.filter((t) => (t as HTMLElement).style.backgroundColor !== "").length);
   expect(styled).toBeGreaterThan(80);
+});
+
+test("library: sort by molecular weight and by name", async ({ page }) => {
+  await start(page);
+  await page.keyboard.press("Control+3");
+  const first = page.locator('[data-testid^="library-card-"]').first();
+  await page.getByTestId("library-sort").click();
+  await page.getByRole("option", { name: "Molecular weight" }).click();
+  await expect(first).toContainText("Hydrogen");
+  await page.getByTestId("library-sort").click();
+  await page.getByRole("option", { name: "Name" }).click();
+  await expect(first).toContainText("Adrenaline");
 });
 
 for (const [theme, locale] of [["light", "en"], ["dark", "en"], ["light", "th"]] as const) {

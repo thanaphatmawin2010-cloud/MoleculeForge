@@ -100,7 +100,7 @@ invented numbers.
 The library holds more than 180 prebuilt molecules, from water and ions to drugs, sugars, amino
 acids and solvents, plus everything you save. It is arranged like a periodic table of families.
 You can search by name, formula or SMILES, filter to built-in molecules, your own molecules or
-favourites, and star a molecule as a favourite. The open and insert buttons on each card load the
+favourites, sort by name, recently saved or molecular weight, and star a molecule as a favourite. The open and insert buttons on each card load the
 molecule into the editor or add it to the current drawing.
 
 * **Save to library** (inspector) files your molecule into a family automatically. If an identical

@@ -1,6 +1,7 @@
 /** Molecule library (spec 7.6/7.7): periodic-table-style family grid, search, favourites, import/export. */
+import * as Select from "@radix-ui/react-select";
 import { motion } from "framer-motion";
-import { Download, FolderOpen, Heart, PackagePlus, PenLine, Search, Star, Trash2, Upload } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Download, FolderOpen, Heart, PackagePlus, PenLine, Search, Star, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Formula } from "@/design-system/formula";
@@ -87,6 +88,9 @@ function Card({ item, onChanged }: { item: LibraryItem; onChanged: () => void })
   );
 }
 
+const SORT_KEYS = ["default", "name", "recent", "weight"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+
 export function LibraryView() {
   const { t } = useTranslation();
   const pushToast = useApp((s) => s.pushToast);
@@ -95,6 +99,7 @@ export function LibraryView() {
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<"all" | "prebuilt" | "user">("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [sort, setSort] = useState<SortKey>("default");
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [version, setVersion] = useState(0);
@@ -106,13 +111,13 @@ export function LibraryView() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      api.libraryList({ query, category, source, favoritesOnly, limit: 400 }).then((r) => {
+      api.libraryList({ query, category, source, favoritesOnly, sort, limit: 400 }).then((r) => {
         setItems(r.items);
         setTotal(r.total);
       });
     }, query ? 150 : 0);
     return () => window.clearTimeout(timer);
-  }, [query, category, source, favoritesOnly, version]);
+  }, [query, category, source, favoritesOnly, sort, version]);
 
   const grid = useMemo(() => [...categories].sort((a, b) => a.row - b.row || a.col - b.col), [categories]);
 
@@ -213,6 +218,24 @@ export function LibraryView() {
             <Button variant={favoritesOnly ? "primary" : "ghost"} size="sm" icon={<Heart className="size-3.5" />} onClick={() => setFavoritesOnly((v) => !v)}>
               {t("library.favoritesOnly")}
             </Button>
+            <Select.Root value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <Select.Trigger className="inline-flex h-9 items-center gap-2 rounded bg-surface-1 px-3 text-sm text-ink hairline" aria-label={t("library.sort.label")} data-testid="library-sort">
+                <ArrowUpDown className="size-3.5 text-ink-3" />
+                <Select.Value />
+                <ChevronDown className="size-4 text-ink-3" />
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Content position="popper" sideOffset={4} className="z-50 rounded bg-surface-1 p-1 shadow-3 hairline">
+                  <Select.Viewport>
+                    {SORT_KEYS.map((key) => (
+                      <Select.Item key={key} value={key} className="cursor-pointer rounded-sm px-3 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-surface-3">
+                        <Select.ItemText>{t(`library.sort.${key}`)}</Select.ItemText>
+                      </Select.Item>
+                    ))}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
             {category && (
               <Badge tone="accent" className="cursor-pointer" onClick={() => setCategory(null)}>
                 {t(`library.category.${category}`)} ×

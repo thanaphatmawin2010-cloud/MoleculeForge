@@ -287,6 +287,7 @@ export function CanvasView() {
               <Viewer3D
                 className="size-full"
                 molecule={m}
+                formula={(quick?.formula?.value as string) ?? formulaOf(m, implicitH)}
                 selectedAtoms={selection.atoms}
                 errorAtoms={errorAtoms}
                 warningAtoms={warningAtoms}

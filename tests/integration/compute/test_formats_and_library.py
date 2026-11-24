@@ -98,3 +98,21 @@ def test_property_results_are_cached_by_inchikey_and_method(sidecar: Any) -> Non
     assert "cached" in [w["code"] for w in second["warningCodes"]]
     assert second["properties"]["molecularWeight"] == first["properties"]["molecularWeight"]
 
+
+def test_library_can_be_sorted_by_name_weight_and_recency(sidecar: Any) -> None:
+    """§7.7: sort the library."""
+    by_name = [i["name"].lower() for i in sidecar.call("library.list", {"sort": "name", "limit": 500})["items"]]
+    assert by_name == sorted(by_name)
+    weights = [i["descriptors"]["molecularWeight"] for i in sidecar.call("library.list", {"sort": "weight", "limit": 500})["items"]
+               if (i.get("descriptors") or {}).get("molecularWeight") is not None]
+    assert len(weights) >= 100 and weights == sorted(weights)
+    saved = sidecar.call("library.save", {"molecule": sidecar.molecule("CCCCOC(=O)C", "sorted newest"), "layout2d": None})
+    if not saved["saved"]:
+        saved = sidecar.call("library.save", {"molecule": sidecar.molecule("CCCCOC(=O)C", "sorted newest"), "layout2d": None,
+                                               "overwrite": True})
+    assert sidecar.call("library.list", {"sort": "recent", "limit": 1})["items"][0]["id"] == saved["id"]
+    from conftest import RpcFailure
+
+    with pytest.raises(RpcFailure):
+        sidecar.call("library.list", {"sort": "name; DROP TABLE molecules"})
+

@@ -130,6 +130,7 @@ libraries, Meeko, libquadmath, OpenMM's GPU platforms) are separate processes or
 10. **The MoleculeForge code is MIT-licensed.**
 11. **GPU performance** (60 fps at 5,000 atoms, GPU-accelerated MD and LLM) depends on the user's
     hardware. This machine has no GPU, so measurements here use software rendering and the CPU.
+12. **Sound cues**, which §7.1 lists as optional, are not included.
 
 ## Element data cross-check (§7.5)
 
@@ -200,19 +201,19 @@ measurement. NOT VERIFIED HERE means it cannot be checked on this machine; the r
 | 7.1 Design tokens; no unstyled components | VERIFIED | `ui/src/design-system`; token contrast tests (Vitest) |
 | 7.1 a11y (AA contrast, keyboard, labels) | VERIFIED | axe (WCAG 2 A/AA) on all four views plus element detail, command palette and assistant, in light, dark and Thai: no serious or critical findings |
 | 7.1 ~60 fps interaction | VERIFIED for 2D and panels; 3D see §10 | drawing 50 atoms: longest main-thread task 52–60 ms across runs; median frame 16.7 ms while a simulation runs |
-| 7.2 Canvas: all elements and bond types, undo/redo, measure, 2D/3D sync | VERIFIED | Vitest graph and measurement tests (distance, angle, signed dihedral); e2e journey and drag-and-drop test |
+| 7.2 Canvas: all elements and bond types, undo/redo, measure, 2D/3D sync | VERIFIED | Vitest graph and measurement tests (distance, angle, signed dihedral); e2e journey; drag-and-drop test (the 3D view follows the sketch, and undo) |
 | 7.2 Lossless round-trip MOL/SDF/SMILES/XYZ/PDB | VERIFIED | `tests/integration/compute/test_formats_and_library.py` (assumption 2 defines lossless) |
 | 7.2 50-atom molecule without lag | VERIFIED | e2e: 49 bond edits in 9.5–10.1 s (including the test driver's pointer moves), longest main-thread task 52–60 ms |
 | 7.3 Live validation messages, reason codes, fix log, < 100 ms | VERIFIED | unit and integration tests (exact messages, codes, the `{before, reason, fix, after}` fix log); latency test < 100 ms |
 | 7.4 One-click repair: progress, cancel, no clash < 0.7 Å, ±10 % geometry, report PDF/Markdown, idempotent | VERIFIED | chemistry-validation tests (§8 geometry within ±0.03 Å and ±2°); progress and cancellation tests (the DFT worker is terminated); report export test, including non-Latin names; "already optimal" idempotency test; no-clash test over the library |
 | 7.5 Periodic table: 118 elements, all fields with units, detail, heatmap, search, trends, localised | VERIFIED | element unit tests; cross-check above; e2e periodic-table test (search, detail, heat map, trends); axe scans in English and Thai |
 | 7.6 ≥ 100 prebuilt molecules, validated with zero corrections, insertable as fragments | VERIFIED | 187 molecules; `test_prebuilt_library.py` (each validates with zero corrections, no atoms closer than 0.7 Å); fragment insertion by button and by drag-and-drop |
-| 7.7 Storage: auto-category, InChIKey duplicates, periodic-style grid, persistence, import/export | VERIFIED | library integration tests (duplicate detection, export, persistence across an engine restart); e2e save |
+| 7.7 Storage: auto-category, InChIKey duplicates, periodic-style grid, tags, search, sort, favourites, persistence, import/export | VERIFIED | library integration tests (duplicate detection, full-text search over names, formulas, SMILES and tags, sorting, favourites, export, persistence across an engine restart); e2e save and sort |
 | 7.8 Simulation: offline, full property set with units and methods, progress and cancel, cache, export | VERIFIED | integration tests (units and methods, progress, cancellation, cache by InChIKey and method); Vitest CSV/JSON export tests; validation report |
 | 7.8 GPU used automatically when present | NOT VERIFIED HERE | no GPU on this machine; `system.capabilities` detects OpenMM CUDA/OpenCL and llama.cpp Vulkan back-ends and selects them |
 | 7.8 Several thousand atoms without crashing | VERIFIED | 5,001-atom structure loaded, validated and rendered (e2e) |
 | 7.9 Runtime language switch, zero untranslated strings, ICU plurals, RTL | VERIFIED | i18n gate (770 keys × 2 locales); Vitest ICU and RTL tests; e2e switch to Thai |
-| 7.10 Local assistant calls the real tools, never invents numbers, refuses unsafe requests, offline | VERIFIED | slow integration tests with both bundled models (Qwen3-4B-Instruct-2507 and Qwen3-1.7B): tools called, MW 46.07 for ethanol, refusal, loopback sockets only; e2e journey in Thai |
+| 7.10 Local assistant calls the real tools, never invents numbers, refuses unsafe requests, offline | VERIFIED | slow integration tests with both bundled models (Qwen3-4B-Instruct-2507 and Qwen3-1.7B): tools called, MW 46.07 for ethanol, refusal, loopback sockets only; a streaming answer cancelled with `ai.cancel`; e2e journey in Thai |
 | 7.10 GPU-accelerated when available | NOT VERIFIED HERE | no GPU; llama.cpp is built with the Vulkan back-end and offloads automatically when a device is reported |
 
 ### §10 budgets (measured here, no GPU)
@@ -245,5 +246,5 @@ section against the running application, the test results and the licences.
 | 8. Full audit (documents re-read; every status claim traced to its test) | the log called the library's water geometry MMFF94 (it is MMFF94s); no tests behind six claims (measurement maths, persistence across a restart, CSV/JSON export, the `{before, reason, fix, after}` fix log, result caching, cancelling a repair); Thai molecule names lost their vowel marks in export file names and their whole name in repair-report file names | wording; the six tests (export moved into a testable module); file-name stems keep Unicode letters, marks and digits, with tests |
 | 9. Full audit (all suites re-run; documents re-read) | the README's test table lacked ruff/mypy and the installed-app launch check, and its scripts list the AppImage and launch-check scripts; the tests that engine codes are translated covered only `en` and `th`, so a newly added language would have passed unchecked | README completed; the tests now cover every locale folder, and docs/ADDING_A_LOCALE.md says so |
 | 10. Full audit (specification §4 and §6 traced field by field; installers rebuilt and relaunched; all suites re-run) | every §4.3 method and §6 field present, but the prebuilt molecules' `meta.created` held the catalogue version ("2026.11.1") instead of an ISO 8601 time (§6.1) | catalogue release timestamp in ISO 8601; library rewritten; test |
-| 11. Full audit | __AUDIT11__ | |
+| 11. Full audit (§7, §9 and §10 re-read clause by clause) | no integration test called `ai.cancel` (§9.2 asks for every §4.3 method); nothing asserted 2D↔3D sync; the 3D view's accessible name gave benzene as "C6" (no implicit hydrogens, and stale after edits); the library could not be sorted (§7.7); the optional sound cues were not recorded as omitted | cancellation tests (a streaming answer stops within seconds); 2D↔3D assertion; the canvas passes the live formula to the 3D view; sort by name, recency or molecular weight (sidecar enum, UI control, en/th, tests); assumption 12 |
 | 12. Full audit | __AUDIT12__ | |

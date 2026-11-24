@@ -224,6 +224,8 @@ class LibraryListParams(Strict):
     category: str | None = None
     source: Literal["prebuilt", "user", "all"] = "all"
     favoritesOnly: bool = False
+    #: "default": built-in molecules first, then by name; "recent": last saved first.
+    sort: Literal["default", "name", "recent", "weight"] = "default"
     limit: int = Field(default=500, ge=1, le=5000)
     offset: int = Field(default=0, ge=0)
 

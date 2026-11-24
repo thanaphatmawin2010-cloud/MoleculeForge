@@ -28,6 +28,8 @@ export interface Viewer3DProps {
   className?: string;
   testId?: string;
   fitKey?: string;
+  /** Formula for the accessible name; the editor passes the live one (implicit hydrogens included). */
+  formula?: string;
 }
 
 const VDW: Record<string, number> = { H: 1.2, C: 1.7, N: 1.55, O: 1.52, F: 1.47, P: 1.8, S: 1.8, Cl: 1.75, Br: 1.85, I: 1.98 };
@@ -65,6 +67,7 @@ export function Viewer3D({
   className,
   testId = "viewer-3d",
   fitKey,
+  formula,
 }: Viewer3DProps) {
   const { t } = useTranslation();
   const theme = useApp((s) => s.theme);
@@ -449,7 +452,7 @@ export function Viewer3D({
       data-testid={testId}
       data-atoms={molecule.atoms.length}
       role="img"
-      aria-label={t("canvas.viewerLabel", { count: molecule.atoms.length, formula: molecule.formula || formulaOf(molecule) })}
+      aria-label={t("canvas.viewerLabel", { count: molecule.atoms.length, formula: formula || molecule.formula || formulaOf(molecule) })}
     >
       {webglMissing && (
         <p className="absolute inset-0 grid place-items-center p-6 text-center text-xs leading-5 text-ink-3" data-testid="webgl-missing">

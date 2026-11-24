@@ -28,6 +28,11 @@ def test_cancelling_a_running_job(sidecar: Any) -> None:
     assert time.time() - started < 5
 
 
+def test_cancel_requests_for_unknown_jobs_are_harmless(sidecar: Any) -> None:
+    assert sidecar.call("ai.cancel", {"jobId": "no-such-turn"})["cancelled"] is False
+    assert sidecar.call("job.cancel", {"jobId": "no-such-job"})["cancelled"] is False
+
+
 def test_transport_job_id_is_accepted_everywhere(sidecar: Any) -> None:
     assert sidecar.call("library.list", {"limit": 1}, job_id="ui-123")["items"]
     assert sidecar.call("elements.get", {"symbol": "C"}, job_id="ui-124")["symbol"] == "C"

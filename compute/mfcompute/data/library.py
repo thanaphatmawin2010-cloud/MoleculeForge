@@ -43,6 +43,15 @@ CREATE VIRTUAL TABLE IF NOT EXISTS molecules_fts USING fts5(id UNINDEXED, name, 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
 
+# Fixed SQL fragments chosen by a validated enum (never built from user text).
+_WEIGHT = "json_extract(m.descriptors, '$.molecularWeight')"
+ORDER = {
+    "default": "m.source DESC, m.name COLLATE NOCASE",
+    "name": "m.name COLLATE NOCASE",
+    "recent": "m.updated DESC, m.name COLLATE NOCASE",
+    "weight": f"{_WEIGHT} IS NULL, {_WEIGHT}, m.name COLLATE NOCASE",
+}
+
 
 def _valid_layout(layout: Any, n_atoms: int) -> bool:
     """A 2D layout is kept only if it has one finite (x, y) pair per atom; otherwise the UI lays it out."""
@@ -130,7 +139,7 @@ class LibraryStore:
         with self._lock:
             total = self._conn.execute(f"SELECT COUNT(*) FROM molecules m {where}", args).fetchone()[0]
             rows = self._conn.execute(
-                f"SELECT * FROM molecules m {where} ORDER BY m.source DESC, m.name COLLATE NOCASE LIMIT ? OFFSET ?",
+                f"SELECT * FROM molecules m {where} ORDER BY {ORDER[params.sort]} LIMIT ? OFFSET ?",
                 [*args, params.limit, params.offset]).fetchall()
         return {"total": total, "items": [self._summary(r) for r in rows]}
 
