@@ -49,7 +49,8 @@ jobs:
           key: engines-${{ runner.os }}-${{ hashFiles('scripts/engines.lock.json') }}
       - run: python3 scripts/fetch_engines.py
       - run: cd compute && uv sync --all-groups
-      - run: cd compute && uv run ruff check mfcompute ../scripts
+      - run: cd compute && uv run ruff check mfcompute ../scripts ../tests
+      - run: cd compute && uv run mypy mfcompute
       - run: cd compute && uv run pytest -m "not slow"
       - run: cd compute && uv run pytest -m slow
       - run: compute/.venv/bin/python scripts/validation_report.py

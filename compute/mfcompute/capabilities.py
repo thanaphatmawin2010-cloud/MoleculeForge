@@ -224,12 +224,17 @@ def detect(refresh: bool = False) -> dict[str, Any]:
         vm = psutil.virtual_memory()
         try:
             import openmm
-            import pyscf
             import rdkit
 
-            libs = {"rdkit": rdkit.__version__, "openmm": openmm.__version__, "pyscf": pyscf.__version__}
+            libs = {"rdkit": rdkit.__version__, "openmm": openmm.__version__}
         except ImportError as exc:  # pragma: no cover - packaging error
             libs = {"error": str(exc)}
+        try:
+            import pyscf
+
+            libs["pyscf"] = pyscf.__version__
+        except ImportError:  # not published for Windows: DFT steps report themselves unavailable
+            libs["pyscf"] = "unavailable"
         gpus = gpu_adapters()
         mm_platforms = openmm_platforms()
         llm_devices = llama_devices()

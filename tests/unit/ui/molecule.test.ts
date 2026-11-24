@@ -7,6 +7,7 @@ import {
   emptyDoc,
   forgetStereo,
   formulaOf,
+  insertFragment,
   normalizeLayout,
   removeAtoms,
   setBondOrder,
@@ -74,6 +75,24 @@ describe("molecule graph operations", () => {
 
   it("mirrors y when converting to the RDKit (y-up) orientation, and back", () => {
     expect(toRdkitLayout([[1, 2], [-3, 4]])).toEqual([[1, -2], [-3, -4]]);
+  });
+
+  it("inserts a fragment beside the drawing, or centred where it was dropped", () => {
+    const base = water();
+    const frag = water().molecule;
+    const beside = insertFragment(base, frag, null);
+    expect(beside.molecule.atoms).toHaveLength(6);
+    expect(beside.molecule.bonds.map((b) => [b.a, b.b])).toContainEqual([3, 4]);
+    const maxBase = Math.max(...base.layout.map((p) => p[0]));
+    expect(Math.min(...beside.layout.slice(3).map((p) => p[0]))).toBeGreaterThan(maxBase);
+    const dropped = insertFragment(base, frag, null, [10, -4]);
+    const added = dropped.layout.slice(3);
+    const centre = [added.reduce((s, p) => s + p[0], 0) / added.length, added.reduce((s, p) => s + p[1], 0) / added.length];
+    expect(centre[0]).toBeCloseTo(10, 6);
+    expect(centre[1]).toBeCloseTo(-4, 6);
+    // In 3D the fragment never overlaps the existing atoms.
+    const maxBase3 = Math.max(...base.molecule.atoms.map((a) => a.x));
+    expect(Math.min(...dropped.molecule.atoms.slice(3).map((a) => a.x))).toBeGreaterThan(maxBase3);
   });
 
   it("forgets the source's stereo after any structural edit", () => {

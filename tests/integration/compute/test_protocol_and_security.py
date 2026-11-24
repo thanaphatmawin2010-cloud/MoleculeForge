@@ -57,3 +57,23 @@ def test_no_non_loopback_sockets(sidecar: Any) -> None:
             for address in (conn.laddr, conn.raddr):
                 if address:
                     assert address.ip in ("127.0.0.1", "::1"), f"{proc.name()} uses non-loopback socket {conn}"
+
+
+def test_model_choice_is_validated_applied_and_reset(sidecar: Any, tmp_path: Path) -> None:
+    """Assistant > Language model: only real GGUF files are accepted; the bundled model can be restored."""
+    from conftest import RpcFailure
+
+    assert sidecar.call("ai.status", {})["model"]["bundled"] is True
+    impostor = tmp_path / "impostor.gguf"
+    impostor.write_bytes(b"MZ\x90\x00" + bytes(64))
+    with pytest.raises(RpcFailure):
+        sidecar.call("ai.configure", {"modelPath": str(impostor)})
+    with pytest.raises(RpcFailure):
+        sidecar.call("ai.configure", {"modelPath": str(tmp_path / "missing.gguf")})
+    chosen = tmp_path / "tiny-model.gguf"
+    chosen.write_bytes(b"GGUF" + bytes(64))
+    status = sidecar.call("ai.configure", {"modelPath": str(chosen)})
+    assert status["model"]["name"] == "tiny-model" and status["model"]["bundled"] is False
+    assert sidecar.call("ai.status", {})["model"]["name"] == "tiny-model"
+    status = sidecar.call("ai.configure", {"useDefault": True})
+    assert status["model"]["bundled"] is True and status["model"]["name"] == status["bundledModel"]

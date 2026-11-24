@@ -5,8 +5,10 @@ Slow (a 4B-parameter model on CPU); run with ``-m slow`` or as part of the full 
 from __future__ import annotations
 
 import contextlib
+import os
 import re
 import threading
+from collections.abc import Iterator
 from typing import Any
 
 import psutil
@@ -14,6 +16,18 @@ import pytest
 
 pytestmark = pytest.mark.slow
 TOOLS = {"sanitize", "validateBonds", "repairGeometry", "descriptors", "simulate", "dock", "getElement", "lookupMolecule"}
+
+
+@pytest.fixture(autouse=True)
+def _model(sidecar: Any) -> Iterator[None]:
+    """MF_TEST_MODEL=<path to a .gguf> runs these tests against another model (e.g. a platform's
+    smaller bundled model); by default the bundled model is used."""
+    path = os.environ.get("MF_TEST_MODEL")
+    if path:
+        sidecar.call("ai.configure", {"modelPath": path})
+    yield
+    if path:
+        sidecar.call("ai.configure", {"useDefault": True})
 
 
 def _sockets(pid: int) -> list[Any]:

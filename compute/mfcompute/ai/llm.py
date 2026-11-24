@@ -43,20 +43,50 @@ RUNTIME = _Runtime()
 
 
 def default_model() -> Path | None:
+    """The model bundled with the installer."""
     info = capabilities.model_info()
     path = info.get("path")
     return Path(path) if path and info.get("available") else None
 
 
+def _choice_file() -> Path:
+    return paths.user_dir() / "ai-model.json"
+
+
+def _is_gguf(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            return path.suffix.lower() == ".gguf" and handle.read(4) == b"GGUF"
+    except OSError:
+        return False
+
+
+def chosen_model() -> Path | None:
+    """A model the user picked earlier (Assistant > Model), if it is still a readable GGUF file."""
+    try:
+        data = json.loads(_choice_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    path = Path(str(data.get("path", ""))) if isinstance(data, dict) else None
+    return path if path is not None and path.is_file() and _is_gguf(path) else None
+
+
+def selected_model() -> Path | None:
+    return RUNTIME.model_path or chosen_model() or default_model()
+
+
 def status() -> dict[str, Any]:
-    model = RUNTIME.model_path or default_model()
+    model = selected_model()
+    bundled = default_model()
     running = RUNTIME.proc is not None and RUNTIME.proc.poll() is None
     devices = capabilities.llama_devices()
     return {
         "available": model is not None and model.exists() and paths.executable("llama", "llama-server") is not None,
         "running": running,
         "model": {"path": str(model) if model else None, "name": model.stem if model else None,
-                  "sizeBytes": model.stat().st_size if model and model.exists() else None},
+                  "sizeBytes": model.stat().st_size if model and model.exists() else None,
+                  "bundled": model is not None and bundled is not None and model == bundled},
+        "bundledModel": bundled.stem if bundled else None,
         "contextSize": RUNTIME.context_size,
         "accelerator": devices[0] if devices else "CPU",
         "offloadLayers": _gpu_layers(),
@@ -65,11 +95,16 @@ def status() -> dict[str, Any]:
 
 def configure(params: AiConfigParams) -> dict[str, Any]:
     with _LOCK:
-        if params.modelPath:
+        if params.useDefault:
+            RUNTIME.model_path = None
+            _choice_file().unlink(missing_ok=True)
+        elif params.modelPath:
             candidate = Path(params.modelPath).expanduser().resolve()
-            if not candidate.is_file() or candidate.suffix.lower() != ".gguf":
-                raise RpcError(ENGINE_UNAVAILABLE, "Model must be an existing .gguf file", {"path": str(candidate)})
+            if not candidate.is_file() or not _is_gguf(candidate):
+                raise RpcError(ENGINE_UNAVAILABLE, "Model must be an existing GGUF file", {"path": str(candidate)})
             RUNTIME.model_path = candidate
+            _choice_file().parent.mkdir(parents=True, exist_ok=True)
+            _choice_file().write_text(json.dumps({"path": str(candidate)}), encoding="utf-8")
         RUNTIME.context_size = params.contextSize
         RUNTIME.gpu_layers = params.gpuLayers
         _stop_locked()
@@ -93,7 +128,7 @@ def ensure_running(ctx: JobContext | None = None, timeout: float = 300.0) -> Non
         if RUNTIME.proc is not None and RUNTIME.proc.poll() is None:
             return
         exe = paths.executable("llama", "llama-server")
-        model = RUNTIME.model_path or default_model()
+        model = selected_model()
         if exe is None or model is None or not model.exists():
             raise RpcError(ENGINE_UNAVAILABLE, "The local language model is not installed", {"engine": "llama", "model": str(model)})
         RUNTIME.port = _free_port()
@@ -154,16 +189,22 @@ def stream_chat(
     *,
     temperature: float = 0.2,
     max_tokens: int = 1200,
+    tool_choice: str = "auto",
 ) -> dict[str, Any]:
-    """Stream one assistant turn. Returns {"content", "tool_calls", "finish_reason", "usage"}."""
+    """Stream one assistant turn. Returns {"content", "tool_calls", "finish_reason", "usage"}.
+
+    ``tool_choice="required"`` makes the model call at least one tool (grammar-constrained)."""
     ensure_running(ctx)
     body: dict[str, Any] = {
         "messages": messages, "stream": True, "temperature": temperature, "top_p": 0.9,
         "max_tokens": max_tokens, "cache_prompt": True,
+        # Hybrid reasoning models (e.g. Qwen3-1.7B) answer directly: the numbers come from tool
+        # calls, and hidden reasoning would spend the token budget. Other templates ignore this.
+        "chat_template_kwargs": {"enable_thinking": False},
     }
     if tools:
         body["tools"] = tools
-        body["tool_choice"] = "auto"
+        body["tool_choice"] = tool_choice
         body["parallel_tool_calls"] = True
     conn = http.client.HTTPConnection("127.0.0.1", RUNTIME.port, timeout=900)
     content: list[str] = []

@@ -3,9 +3,9 @@
 Grounding guarantees (spec 7.10, X4):
 * The model is told to obtain every chemical number from tools or the bundled reference notes.
 * After answering, every number in the text is checked against tool results, retrieved notes and
-  the user's own message. If any is unsupported the model gets one chance to revise (the UI is
-  told to discard the streamed draft); if numbers are still unsupported the answer is shown with
-  confidence "low" and the unsupported values listed.
+  the user's own message. If any is unsupported, the draft is discarded (the UI is told to reset)
+  and the model must call at least one tool before answering again; if numbers are still
+  unsupported the answer is shown with confidence "low" and the unsupported values listed.
 """
 
 from __future__ import annotations
@@ -151,11 +151,26 @@ def answer(params: AiQueryParams, ctx: JobContext) -> dict[str, Any]:
         ctx.notify("ai.delta", {"text": text})
 
     final = ""
+    verifying = False  # the draft had unsupported numbers: the next turn must call a tool
+    verified = False
     for _round in range(MAX_ROUNDS):
         ctx.notify("ai.status", {"stage": "thinking"})
-        turn: dict[str, Any] = llm.stream_chat(messages, tools.schemas(), ctx, stream)
+        turn: dict[str, Any] = llm.stream_chat(messages, tools.schemas(), ctx, stream,
+                                               tool_choice="required" if verifying else "auto")
+        verifying = False
         if not turn["tool_calls"]:
             final = turn["content"]
+            draft_unsupported = [n for n in _numbers(final) if not _grounded(n, pool)]
+            if draft_unsupported and not verified:
+                verified = verifying = True
+                ctx.notify("ai.reset", {})
+                messages.append({"role": "assistant", "content": final})
+                messages.append({"role": "user", "content": (
+                    "Verification: these numbers in your answer are not supported by any tool result or reference note: "
+                    + ", ".join(sorted(set(draft_unsupported))[:12])
+                    + ". Call the tools that compute them, then rewrite the answer using only values returned by tools "
+                    "in this conversation. Do not state any other numbers.")})
+                continue
             break
         messages.append({"role": "assistant", "content": turn["content"] or "",
                          "tool_calls": [{"id": c["id"] or f"call_{i}", "type": "function",
@@ -183,18 +198,6 @@ def answer(params: AiQueryParams, ctx: JobContext) -> dict[str, Any]:
         final = final or "I could not complete the request within the tool-call limit."
 
     unsupported = [n for n in _numbers(final) if not _grounded(n, pool)]
-    if unsupported:
-        ctx.notify("ai.reset", {})
-        messages.append({"role": "assistant", "content": final})
-        messages.append({"role": "user", "content": (
-            "Verification: these numbers in your answer are not supported by any tool result or reference note: "
-            + ", ".join(sorted(set(unsupported))[:12])
-            + ". Rewrite the answer using only values returned by tools in this conversation (call a tool if you need "
-            "another value). Do not state any other numbers.")})
-        revised = llm.stream_chat(messages, None, ctx, stream)
-        final = revised["content"] or final
-        unsupported = [n for n in _numbers(final) if not _grounded(n, pool)]
-
     if unsupported:
         confidence = "low"
     elif calls and all(c["ok"] for c in calls):

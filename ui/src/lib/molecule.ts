@@ -226,21 +226,34 @@ export function normalizeLayout(m: Molecule, layout: Vec2[]): Vec2[] {
   return layout.map(([x, y]) => [(x - cx) * k, (y - cy) * k] as Vec2);
 }
 
-export function insertFragment(doc: Doc, fragment: Molecule, layout: Vec2[] | null): Doc {
+/**
+ * Append a fragment as a separate component. In 2D it goes to the right of the drawing, or is
+ * centred on `at` (sketch coordinates) when it was dropped there; in 3D it is placed beside the
+ * existing atoms so the two never overlap before they are bonded and relaxed.
+ */
+export function insertFragment(doc: Doc, fragment: Molecule, layout: Vec2[] | null, at?: Vec2): Doc {
   const offset = doc.molecule.atoms.length;
   const maxX = doc.layout.reduce((m, p) => Math.max(m, p[0]), -Infinity);
   const maxX3 = doc.molecule.atoms.reduce((m, a) => Math.max(m, a.x), -Infinity);
-  const shift2 = Number.isFinite(maxX) ? maxX + 3 : 0;
   const fragMin3 = fragment.atoms.reduce((m, a) => Math.min(m, a.x), Infinity);
   const shift3 = Number.isFinite(maxX3) ? maxX3 - fragMin3 + 3 : 0;
   const fragLayout = normalizeLayout(fragment, layout ?? fragment.atoms.map((a) => [a.x, -a.y] as Vec2));
-  const minX2 = fragLayout.reduce((m, p) => Math.min(m, p[0]), Infinity);
+  let place: (p: Vec2) => Vec2;
+  if (at && fragLayout.length > 0) {
+    const cx = fragLayout.reduce((s, p) => s + p[0], 0) / fragLayout.length;
+    const cy = fragLayout.reduce((s, p) => s + p[1], 0) / fragLayout.length;
+    place = (p) => [p[0] - cx + at[0], p[1] - cy + at[1]];
+  } else {
+    const minX2 = fragLayout.reduce((m, p) => Math.min(m, p[0]), Infinity);
+    const shift2 = Number.isFinite(maxX) ? maxX + 3 : 0;
+    place = (p) => [p[0] - minX2 + shift2, p[1]];
+  }
   const atoms = [
     ...doc.molecule.atoms,
     ...fragment.atoms.map((a) => ({ ...a, i: a.i + offset, x: a.x + shift3 })),
   ];
   const bonds = [...doc.molecule.bonds, ...fragment.bonds.map((b) => ({ ...b, a: b.a + offset, b: b.b + offset }))];
-  const newLayout = [...doc.layout, ...fragLayout.map((p) => [p[0] - minX2 + shift2, p[1]] as Vec2)];
+  const newLayout = [...doc.layout, ...fragLayout.map(place)];
   return withAtoms(doc, atoms, bonds, newLayout);
 }
 

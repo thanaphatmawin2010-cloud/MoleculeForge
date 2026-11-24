@@ -214,6 +214,20 @@ pub fn validate_request(line: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// `ai.configure` may name a model file only if it is the one the user picked in the native
+/// dialog (`picked`); every other request passes unchanged.
+pub fn check_model_path(line: &str, picked: Option<&str>) -> Result<(), String> {
+    let value: Value = serde_json::from_str(line).map_err(|e| format!("request is not JSON: {e}"))?;
+    if value.get("method").and_then(Value::as_str) != Some("ai.configure") {
+        return Ok(());
+    }
+    match value.get("params").and_then(|p| p.get("modelPath")) {
+        None | Some(Value::Null) => Ok(()),
+        Some(Value::String(path)) if Some(path.as_str()) == picked => Ok(()),
+        Some(_) => Err("the model must be chosen in the file dialog".into()),
+    }
+}
+
 pub fn send(state: &SidecarState, line: &str) -> Result<(), String> {
     let mut guard = state.stdin.lock().map_err(|_| "sidecar lock poisoned")?;
     let stdin = guard.as_mut().ok_or("compute engine is not running")?;
@@ -260,7 +274,19 @@ pub fn shutdown(state: &SidecarState) {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_request;
+    use super::{check_model_path, validate_request};
+
+    #[test]
+    fn model_paths_must_come_from_the_dialog() {
+        let pick = r#"{"jsonrpc":"2.0","id":1,"method":"ai.configure","params":{"modelPath":"/models/big.gguf"}}"#;
+        assert!(check_model_path(pick, Some("/models/big.gguf")).is_ok());
+        assert!(check_model_path(pick, Some("/models/other.gguf")).is_err());
+        assert!(check_model_path(pick, None).is_err());
+        let reset = r#"{"jsonrpc":"2.0","id":1,"method":"ai.configure","params":{"useDefault":true}}"#;
+        assert!(check_model_path(reset, None).is_ok());
+        let other = r#"{"jsonrpc":"2.0","id":1,"method":"chem.sanitize","params":{"modelPath":"/x"}}"#;
+        assert!(check_model_path(other, None).is_ok());
+    }
 
     #[test]
     fn accepts_allowed_methods() {

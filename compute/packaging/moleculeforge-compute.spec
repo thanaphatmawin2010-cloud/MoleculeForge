@@ -2,9 +2,11 @@
 #
 #   cd compute && uv run pyinstaller packaging/moleculeforge-compute.spec --noconfirm
 #
-# Output: compute/dist/compute/moleculeforge-compute[.exe] plus _internal/. LGPL components
-# (meeko, and the separately bundled xtb executable) stay as replaceable files, as their
-# licences require; nothing GPL is linked into this process.
+# Output: compute/dist/compute/moleculeforge-compute[.exe] plus _internal/. LGPL components stay
+# replaceable, as their licences require: Meeko ships as plain source files in _internal/meeko/
+# (not inside the compiled archive), xtb is a separate executable, and OpenMM's LGPL GPU platforms
+# are separate shared libraries. Nothing GPL is linked into this process.
+import importlib.util
 import os
 import sysconfig
 from pathlib import Path
@@ -13,12 +15,17 @@ from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_sub
 
 site = Path(sysconfig.get_paths()["purelib"])
 datas, binaries, hiddenimports = [], [], []
-for package in ("rdkit", "openmm", "pyscf", "meeko", "gemmi", "uharfbuzz", "geometric", "networkx"):
+for package in ("rdkit", "openmm", "pyscf", "meeko", "gemmi", "uharfbuzz", "berny", "molsym"):
+    if importlib.util.find_spec(package) is None:  # PySCF and PyBerny are not published for Windows
+        continue
     d, b, h = collect_all(package)
     datas += d
     binaries += b
     hiddenimports += h
 datas += collect_data_files("reportlab")
+# Meeko is analysed like any other package (so its dependencies are collected) but its own modules
+# are taken out of the archive below and shipped as source instead.
+datas += collect_data_files("meeko", include_py_files=True)
 hiddenimports += collect_submodules("mfcompute")
 
 # OpenMM looks for its core and plugin libraries in <site-packages>/OpenMM.libs/lib[/plugins];
@@ -37,6 +44,7 @@ a = Analysis(
     excludes=["tkinter", "matplotlib", "IPython", "pytest", "PyQt5", "PySide6", "notebook", "mendeleev", "pandas"],
     noarchive=False,
 )
+a.pure = [entry for entry in a.pure if entry[0] != "meeko" and not entry[0].startswith("meeko.")]
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz,

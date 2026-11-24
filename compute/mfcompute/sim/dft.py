@@ -1,21 +1,24 @@
 """Kohn–Sham DFT with PySCF in an isolated worker process.
 
 * Single points (B3LYP/def2-SVPD): dipole, orbitals, Mulliken charges, finite-field polarisability.
-* Geometry optimisation (B3LYP/def2-SVP with density fitting, geomeTRIC optimiser) for hydrides
+* Geometry optimisation (B3LYP/def2-SVP with density fitting, PyBerny optimiser) for hydrides
   of a single heavy atom (H2O, NH3, CH4, H2S, HF, ...), where GFN2-xTB angles are not accurate
   enough (it opens water to 107.2° and ammonia to 107.7°; B3LYP gives 103.1° and 105.1°, the
   experimental values being 104.5° and 106.7°) and B3LYP is affordable (about 5–7 s). Larger
   molecules keep GFN2-xTB, which meets the reference tolerances there at a fraction of the cost.
 
 Running PySCF in a spawned process gives hard cancellation (the process is terminated) and
-keeps a numerical failure from taking down the sidecar.
+keeps a numerical failure from taking down the sidecar. PySCF is not published for Windows; there
+``available()`` is false and every DFT step reports itself as unavailable on this platform.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import multiprocessing as mp
 import queue
 import time
+from functools import lru_cache
 from typing import Any
 
 from rdkit import Chem
@@ -30,22 +33,39 @@ HARTREE_TO_EV = 27.211386245988
 AU_POL_TO_A3 = 0.148184711
 FIELD = 0.002  # au, finite-field step
 OPT_BASIS = "def2-svp"
-OPT_METHOD = "B3LYP/def2-SVP (PySCF, density fitting; geomeTRIC optimiser)"
+OPT_METHOD = "B3LYP/def2-SVP (PySCF, density fitting; PyBerny optimiser)"
 MAX_OPT_HEAVY_ATOMS = 1
 MAX_OPT_ATOMS = 8
 HARTREE_TO_KCAL = 627.509474
 
 
+@lru_cache(maxsize=1)
+def available() -> bool:
+    """PySCF (single points) is installed on this platform."""
+    return importlib.util.find_spec("pyscf") is not None
+
+
+@lru_cache(maxsize=1)
+def can_optimize_here() -> bool:
+    """PySCF and its PyBerny optimiser are both installed on this platform."""
+    return available() and importlib.util.find_spec("berny") is not None
+
+
 def supported(mol: Chem.Mol) -> bool:
-    return all(a.GetAtomicNum() <= 86 for a in mol.GetAtoms())
+    return available() and all(a.GetAtomicNum() <= 86 for a in mol.GetAtoms())
 
 
-def can_optimize(mol: Chem.Mol) -> bool:
-    """DFT geometry optimisation is affordable and well defined: tiny, closed-shell, H–Kr."""
+def tiny_hydride(mol: Chem.Mol) -> bool:
+    """One heavy atom, at most eight atoms, closed shell, H–Kr: where a B3LYP geometry is wanted."""
     heavy = sum(1 for a in mol.GetAtoms() if a.GetAtomicNum() > 1)
     return (1 < mol.GetNumAtoms() <= MAX_OPT_ATOMS and heavy <= MAX_OPT_HEAVY_ATOMS
             and all(a.GetAtomicNum() <= 36 for a in mol.GetAtoms())
             and sum(a.GetNumRadicalElectrons() for a in mol.GetAtoms()) == 0)
+
+
+def can_optimize(mol: Chem.Mol) -> bool:
+    """DFT geometry optimisation is affordable, well defined and installed."""
+    return tiny_hydride(mol) and can_optimize_here()
 
 
 def _worker(payload: dict[str, Any], out: Any) -> None:  # pragma: no cover - runs in a child process
@@ -115,12 +135,12 @@ def _opt_worker(payload: dict[str, Any], out: Any) -> None:  # pragma: no cover 
     try:
         import os
 
-        # geomeTRIC logs every step to stdout/stderr; results travel over the queue, so silence it.
+        # Results travel over the queue; stray library output must not reach the protocol channel.
         devnull = os.open(os.devnull, os.O_WRONLY)
         os.dup2(devnull, 1)
         os.dup2(devnull, 2)
         from pyscf import dft, gto, lib
-        from pyscf.geomopt.geometric_solver import kernel as geometric_kernel
+        from pyscf.geomopt.berny_solver import kernel as berny_kernel
 
         lib.num_threads(payload["threads"])
         mol = gto.M(atom=[(el, (x, y, z)) for el, x, y, z in payload["atoms"]], unit="Angstrom",
@@ -140,7 +160,7 @@ def _opt_worker(payload: dict[str, Any], out: Any) -> None:  # pragma: no cover 
             coords = envs["mol"].atom_coords(unit="Angstrom").tolist()
             out.put(("frame", coords, energies[-1], len(energies)))
 
-        converged, mol_eq = geometric_kernel(method(mol), maxsteps=payload["maxSteps"], callback=callback)
+        converged, mol_eq = berny_kernel(method(mol), maxsteps=payload["maxSteps"], callback=callback)
         final = method(mol_eq)
         energy = float(final.kernel())
         out.put(("result", {"coordinates": mol_eq.atom_coords(unit="Angstrom").tolist(), "energy": energy,

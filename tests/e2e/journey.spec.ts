@@ -82,6 +82,15 @@ test("the full journey", async ({ page }) => {
   expect(names.every((n) => ["sanitize", "validateBonds", "repairGeometry", "descriptors", "simulate", "dock", "getElement", "lookupMolecule"].includes(n ?? ""))).toBe(true);
 });
 
+test("a ring template dragged onto the sketch is inserted where it is dropped", async ({ page }) => {
+  await start(page);
+  const sketch = page.getByTestId("sketch-2d");
+  await page.getByTestId("template-benzene").dragTo(sketch, { targetPosition: { x: 180, y: 140 } });
+  await expect(page.getByTestId("formula")).toHaveText("C6H6");
+  await page.keyboard.press("Control+z");
+  await expect(page.getByTestId("formula")).not.toHaveText("C6H6");
+});
+
 for (const [theme, locale] of [["light", "en"], ["dark", "en"], ["light", "th"]] as const) {
   test(`every main view passes an accessibility scan (${theme}, ${locale})`, async ({ page }) => {
     await start(page, theme, locale);

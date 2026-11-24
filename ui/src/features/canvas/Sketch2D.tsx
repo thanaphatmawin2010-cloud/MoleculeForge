@@ -26,6 +26,7 @@ import {
 import { useEditor } from "@/state/editor";
 import { issueAtoms, issueBonds, useValidation } from "@/state/validation";
 import { commit } from "./actions";
+import { FRAGMENT_MIME, insertTemplate } from "./fragments";
 
 interface View {
   cx: number;
@@ -359,6 +360,17 @@ export function Sketch2D({ className }: { className?: string }) {
         onPointerUp={onPointerUp}
         onPointerLeave={() => setHover({})}
         onWheel={onWheel}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes(FRAGMENT_MIME)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={(e) => {
+          const key = e.dataTransfer.getData(FRAGMENT_MIME);
+          if (!key) return;
+          e.preventDefault();
+          void insertTemplate(key, toWorld(e.clientX, e.clientY));
+        }}
         onContextMenu={(e) => e.preventDefault()}
         data-testid="sketch-2d"
       >

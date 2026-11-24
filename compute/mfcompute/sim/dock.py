@@ -22,6 +22,7 @@ from ..chem import convert
 from ..jobs import JobContext, run_process
 from ..models import DockParams
 from ..rpc import CHEMISTRY_ERROR, ENGINE_UNAVAILABLE, RpcError
+from .notes import single
 
 VINA_METHOD = "AutoDock Vina 1.2.7 scoring function"
 MAX_RECEPTOR_ATOMS = 5000
@@ -177,9 +178,7 @@ def run(params: DockParams, ctx: JobContext) -> dict[str, Any]:
         "durationMs": int((time.perf_counter() - started) * 1000),
         "geometry": geometry,
         "properties": properties,
-        "warnings": [
-            "Educational/research estimate: rigid receptor, empirical scoring (typical error ≈ 2–3 kcal/mol), no explicit solvent.",
-        ],
+        **single("dockingEstimate"),
         "data": {"modes": modes, "box": {"center": center.round(3).tolist(), "size": size.round(2).tolist(), "unit": "Å"},
                  "poses": pose_coords, "ligandAtomCount": docked.GetNumAtoms(), "receptorAtomCount": rec.GetNumAtoms(),
                  "contacts": contacts},

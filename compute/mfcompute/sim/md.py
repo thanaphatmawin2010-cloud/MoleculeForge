@@ -17,6 +17,7 @@ from ..chem import convert
 from ..jobs import JobContext
 from ..models import MdParams
 from . import forcefield, openmm_mmff
+from .notes import single
 
 KB_KCAL = 0.0019872043  # kcal/(mol·K)
 R_J = 8.314462618  # J/(mol·K)
@@ -111,7 +112,7 @@ def run(params: MdParams, ctx: JobContext) -> dict[str, Any]:
         "durationMs": int((time.perf_counter() - started) * 1000),
         "geometry": geometry,
         "properties": properties,
-        "warnings": ["Gas-phase single-molecule dynamics; averages are canonical-ensemble estimates with block-averaged uncertainties."],
+        **single("mdGasPhase"),
         "data": {"trajectory": frames, "timeSeries": summary["timeSeries"],
                  "settings": {"temperatureK": params.temperatureK, "timestepFs": params.timestepFs, "steps": params.steps,
                               "frictionPerPs": params.frictionPerPs, "seed": params.seed}},

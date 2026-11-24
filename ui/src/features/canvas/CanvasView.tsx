@@ -26,24 +26,19 @@ import { Quantity } from "@/design-system/quantity";
 import { api } from "@/ipc/api";
 import type { BondOrderT, Molecule, PropertyValue } from "@/ipc/schema";
 import { ELEMENT_KEYS, QUICK_ELEMENTS, elementInk } from "@/lib/chemistry";
-import { angle, dihedral, distance, formulaOf, insertFragment, removeAtoms, removeBonds, updateAtom } from "@/lib/molecule";
+import { angle, dihedral, distance, formulaOf, removeAtoms, removeBonds, updateAtom } from "@/lib/molecule";
 import { useApp } from "@/state/app";
 import { type Tool, useEditor } from "@/state/editor";
 import { issueAtoms, useValidation } from "@/state/validation";
 import { ElementPicker } from "../periodic/ElementPicker";
 import { commit, issueText, relaxNow, scheduleWedges } from "./actions";
+import { FRAGMENT_MIME, insertTemplate, RING_TEMPLATES } from "./fragments";
 import { addHydrogens, relayout, saveToLibrary } from "./io";
 import { RepairDialog } from "./RepairDialog";
 import { Sketch2D } from "./Sketch2D";
 import { type RenderStyle, Viewer3D } from "./Viewer3D";
 
 type Layout = "split" | "2d" | "3d";
-
-const RING_TEMPLATES: { key: string; smiles: string; sides: number; aromatic?: boolean }[] = [
-  { key: "benzene", smiles: "c1ccccc1", sides: 6, aromatic: true },
-  { key: "cyclohexane", smiles: "C1CCCCC1", sides: 6 },
-  { key: "cyclopentane", smiles: "C1CCCC1", sides: 5 },
-];
 
 function RingIcon({ sides, aromatic }: { sides: number; aromatic?: boolean }) {
   const points = Array.from({ length: sides }, (_, k) => {
@@ -173,17 +168,6 @@ export function CanvasView() {
     return () => window.removeEventListener("keydown", onKey);
   }, [deleteSelection]);
 
-  const insertTemplate = async (smiles: string, key: string) => {
-    const { molecules } = await api.convert({ source: "smiles", target: "molecule", data: smiles });
-    const frag = molecules?.[0];
-    if (!frag) return;
-    const heavy = { ...frag, atoms: frag.atoms.filter((a) => a.el !== "H"), bonds: frag.bonds.filter((b) => frag.atoms[b.a]!.el !== "H" && frag.atoms[b.b]!.el !== "H") };
-    const { layout2d } = await api.layout2d(heavy);
-    commit(t("history.insertFragment", { name: t(`canvas.template.${key}`) }), insertFragment(useEditor.getState().doc, heavy, layout2d.map(([x, y]) => [x, -y])), { atoms: [], bonds: [] });
-    window.dispatchEvent(new Event("mf:fit2d"));
-    window.dispatchEvent(new Event("mf:fit3d"));
-  };
-
   const tools: { id: Tool; icon: JSX.Element; label: string; key: string }[] = [
     { id: "select", icon: <MousePointer2 className="size-4" />, label: t("tool.select"), key: "V" },
     { id: "atom", icon: <AtomIcon className="size-4" />, label: t("tool.atom"), key: "C/N/O…" },
@@ -253,7 +237,17 @@ export function CanvasView() {
         <div className="mx-1 h-6 w-px bg-line" />
         <div className="flex items-center gap-0.5">
           {RING_TEMPLATES.map((tpl) => (
-            <IconButton key={tpl.key} label={t(`canvas.template.${tpl.key}`)} onClick={() => void insertTemplate(tpl.smiles, tpl.key)} data-testid={`template-${tpl.key}`}>
+            <IconButton
+              key={tpl.key}
+              label={t(`canvas.template.${tpl.key}`)}
+              onClick={() => void insertTemplate(tpl.key)}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(FRAGMENT_MIME, tpl.key);
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              data-testid={`template-${tpl.key}`}
+            >
               <RingIcon sides={tpl.sides} aromatic={tpl.aromatic} />
             </IconButton>
           ))}

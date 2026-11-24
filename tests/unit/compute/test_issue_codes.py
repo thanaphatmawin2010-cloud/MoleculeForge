@@ -67,3 +67,32 @@ def test_auto_fix_reports_bond_connection_fixed_successfully() -> None:
     fix = result["fixes"][0]
     assert fix["fix"]["params"], "fixes carry display parameters for localisation"
     assert fix["reason"] == "VALENCE_EXCEEDED" and fix["reasonParams"]["atom"] == 1
+
+
+def test_every_simulation_warning_is_localised_with_the_same_parameters() -> None:
+    """Simulation warnings reach the UI as codes; each needs text in every locale using its parameters."""
+    import re
+
+    from mfcompute.sim import notes
+
+    placeholder = re.compile(r"{(\w+)}")
+    for lang in ("en", "th"):
+        locale = json.loads((ROOT / "ui" / "src" / "locales" / lang / "common.json").read_text(encoding="utf-8"))["simWarning"]
+        assert set(notes.TEXT) == set(locale), lang
+        for code, english in notes.TEXT.items():
+            wanted = set(placeholder.findall(english))
+            used = set(re.findall(r"{(\w+)[,}]", locale[code]))
+            assert wanted <= used, (lang, code, wanted - used)
+
+
+def test_warning_text_and_codes_stay_aligned() -> None:
+    from mfcompute.sim.notes import Notes
+
+    collected = Notes()
+    collected.add("hessianSizeLimit", atoms=40, level="fast", limit=30)
+    collected.add("dftUnavailable")
+    result = collected.as_result()
+    assert result["warnings"] == ["Vibrational analysis skipped: 40 atoms exceed the fast limit of 30.",
+                                  "DFT skipped: PySCF is not available on this platform; tight-binding values are reported."]
+    assert [c["code"] for c in result["warningCodes"]] == ["hessianSizeLimit", "dftUnavailable"]
+    assert result["warningCodes"][0]["params"] == {"atoms": 40, "level": "fast", "limit": 30}

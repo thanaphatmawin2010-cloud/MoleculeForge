@@ -80,7 +80,11 @@ export const SimulationResultSchema = z.object({
   durationMs: z.number(),
   geometry: MoleculeSchema,
   properties: z.record(z.string(), PropertyValueSchema),
+  /** English sentences (exports, the assistant); the UI shows warningCodes in the user's language. */
   warnings: z.array(z.string()),
+  warningCodes: z
+    .array(z.object({ code: z.string().max(64), params: z.record(z.string(), z.union([z.string(), z.number()])) }))
+    .default([]),
   data: z.record(z.string(), z.unknown()).optional(),
 });
 

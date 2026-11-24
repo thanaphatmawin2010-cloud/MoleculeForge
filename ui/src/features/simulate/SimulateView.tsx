@@ -289,8 +289,11 @@ export function SimulateView() {
                     }
                   />
                   {result.warnings.length > 0 && (
-                    <ul className="space-y-1 border-b border-line px-4 py-3">
-                      {result.warnings.map((w, i) => (
+                    <ul className="space-y-1 border-b border-line px-4 py-3" data-testid="simulation-warnings">
+                      {(result.warningCodes.length === result.warnings.length
+                        ? result.warningCodes.map((w) => t(`simWarning.${w.code}`, w.params))
+                        : result.warnings
+                      ).map((w, i) => (
                         <li key={i} className="text-xs text-warning">{w}</li>
                       ))}
                     </ul>

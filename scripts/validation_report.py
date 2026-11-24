@@ -163,7 +163,7 @@ def main() -> int:
         "## Methods",
         "",
         "* **Geometry.** Repair embeds with RDKit ETKDGv3 (seed 0x5EED) when needed, minimises with MMFF94, then refines:",
-        "  hydrides of a single heavy atom (H₂O, NH₃, CH₄) with B3LYP/def2-SVP (PySCF, geomeTRIC optimiser), larger",
+        "  hydrides of a single heavy atom (H₂O, NH₃, CH₄) with B3LYP/def2-SVP (PySCF, PyBerny optimiser), larger",
         "  molecules with GFN2-xTB (xtb 6.8.0, tight convergence). A structure already within 0.005 Å RMSD or",
         "  0.05 kcal/mol of the refined minimum is reported as already optimal and returned unchanged.",
         "* **Dipole moments.** B3LYP/def2-SVPD single point (PySCF) at the GFN2-xTB geometry of the property battery.",

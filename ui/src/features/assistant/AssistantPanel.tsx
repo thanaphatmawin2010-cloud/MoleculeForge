@@ -1,13 +1,15 @@
 /** Local chemistry assistant panel (spec 7.10): streaming answers with visible, inspectable tool calls. */
 import DOMPurify from "dompurify";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Check, Loader2, Send, ShieldCheck, Square, TriangleAlert, Wrench, X } from "lucide-react";
+import * as Dropdown from "@radix-ui/react-dropdown-menu";
+import { Bot, Check, Cpu, Loader2, Send, ShieldCheck, Square, TriangleAlert, Wrench, X } from "lucide-react";
 import { marked } from "marked";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge, Button, IconButton, cx } from "@/design-system/primitives";
-import { type AiAnswer, api, askAssistant } from "@/ipc/api";
+import { type AiAnswer, type AiStatus, api, askAssistant } from "@/ipc/api";
 import { rpc, RpcError } from "@/ipc/client";
+import { canChooseModel, chooseModelFile } from "@/lib/files";
 import { useApp } from "@/state/app";
 import { useEditor } from "@/state/editor";
 
@@ -47,14 +49,34 @@ export function AssistantPanel() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
-  const [status, setStatus] = useState<{ available: boolean; accelerator: string; name: string | null } | null>(null);
+  const [status, setStatus] = useState<AiStatus | null>(null);
+  const [statusFailed, setStatusFailed] = useState(false);
   const jobRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open || status) return;
-    api.aiStatus().then((s) => setStatus({ available: s.available, accelerator: s.accelerator, name: s.model.name })).catch(() => setStatus({ available: false, accelerator: "", name: null }));
-  }, [open, status]);
+    if (!open || status || statusFailed) return;
+    api.aiStatus().then(setStatus).catch(() => setStatusFailed(true));
+  }, [open, status, statusFailed]);
+
+  const pushToast = useApp((s) => s.pushToast);
+  const applyModel = async (config: { modelPath?: string; useDefault?: boolean }) => {
+    try {
+      const next = await api.aiConfigure(config);
+      setStatus(next);
+      pushToast({ tone: "success", title: t("assistant.model.changed", { model: next.model.name ?? "" }) });
+    } catch (err) {
+      pushToast({ tone: "danger", title: t("assistant.model.failed"), body: err instanceof Error ? err.message : String(err) });
+    }
+  };
+  const chooseModel = async () => {
+    try {
+      const picked = await chooseModelFile();
+      if (picked) await applyModel({ modelPath: picked.path });
+    } catch (err) {
+      pushToast({ tone: "danger", title: t("assistant.model.failed"), body: err instanceof Error ? err.message : String(err) });
+    }
+  };
 
   useEffect(() => {
     return rpc().onNotification((method, params) => {
@@ -146,10 +168,36 @@ export function AssistantPanel() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-ink">{t("assistant.title")}</p>
-              <p className="truncate text-2xs text-ink-3">
-                {status ? (status.available ? t("assistant.runningOn", { model: status.name ?? "", device: status.accelerator }) : t("assistant.unavailable")) : "…"}
+              <p className="truncate text-2xs text-ink-3" data-testid="assistant-model">
+                {status?.available
+                  ? t("assistant.runningOn", { model: status.model.name ?? "", device: status.accelerator })
+                  : status || statusFailed
+                    ? t("assistant.unavailable")
+                    : t("assistant.model.checking")}
               </p>
             </div>
+            {canChooseModel() && (
+              <Dropdown.Root>
+                <Dropdown.Trigger asChild>
+                  <IconButton size="sm" label={t("assistant.model.menu")} data-testid="assistant-model-menu">
+                    <Cpu className="size-4" />
+                  </IconButton>
+                </Dropdown.Trigger>
+                <Dropdown.Portal>
+                  <Dropdown.Content align="end" sideOffset={6} className="z-50 max-w-72 rounded bg-surface-1 p-1 shadow-3 hairline">
+                    <Dropdown.Label className="px-3 py-1.5 text-2xs text-ink-3">{t("assistant.model.hint")}</Dropdown.Label>
+                    <Dropdown.Item onSelect={() => void chooseModel()} className="cursor-pointer rounded-sm px-3 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-surface-3">
+                      {t("assistant.model.choose")}
+                    </Dropdown.Item>
+                    {status?.bundledModel && !status.model.bundled && (
+                      <Dropdown.Item onSelect={() => void applyModel({ useDefault: true })} className="cursor-pointer rounded-sm px-3 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-surface-3">
+                        {t("assistant.model.useBundled", { model: status.bundledModel })}
+                      </Dropdown.Item>
+                    )}
+                  </Dropdown.Content>
+                </Dropdown.Portal>
+              </Dropdown.Root>
+            )}
             <Badge tone="success">
               <ShieldCheck className="size-3" />
               {t("assistant.offline")}
@@ -256,7 +304,7 @@ export function AssistantPanel() {
                   {t("action.stop")}
                 </Button>
               ) : (
-                <Button type="submit" size="sm" variant="primary" icon={<Send className="size-3.5" />} disabled={!input.trim() || status?.available === false} data-testid="assistant-send">
+                <Button type="submit" size="sm" variant="primary" icon={<Send className="size-3.5" />} disabled={!input.trim() || status?.available === false || statusFailed} data-testid="assistant-send">
                   {t("assistant.send")}
                 </Button>
               )}

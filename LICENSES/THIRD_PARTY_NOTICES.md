@@ -1,9 +1,12 @@
 # Third-party notices
 
 MoleculeForge bundles the components below. Each directory holds the licence text(s) as
-published by the project at the shipped version. GPL-licensed code is not linked into any
-MoleculeForge binary; LGPL components (xtb, Meeko) run as separate processes or ship as
-replaceable files.
+published by the project at the shipped version; where a package ships none, the canonical
+SPDX text is in `common/`. GPL-licensed code is not linked into any MoleculeForge binary:
+the GCC runtime libraries used by the engines carry the GCC Runtime Library Exception and
+the PyInstaller bootloader its own exception. LGPL components (xtb with dftd4, s-dftd3 and
+tblite; Meeko; libquadmath; OpenMM's GPU platforms) run as separate processes or ship as
+replaceable files: Meeko as plain Python source in the sidecar's `_internal/meeko/`.
 
 ## Compute sidecar (Python)
 
@@ -14,10 +17,12 @@ replaceable files.
 | gemmi | 0.7.5 | MPL-2.0 | python/gemmi-0.7.5/LICENSE.txt |
 | h5py | 3.16.0 | BSD-3-Clause | python/h5py-3.16.0/LICENSE<br>python/h5py-3.16.0/license.txt<br>python/h5py-3.16.0/LICENSE.txt |
 | meeko | 0.8.0 | LGPL-2.1 | python/meeko-0.8.0/LICENSE |
+| MolSym | 1.3.1 | MIT | python/MolSym-1.3.1/LICENSE.txt |
 | numpy | 2.5.5 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | python/numpy-2.5.5/LICENSE.txt<br>python/numpy-2.5.5/LICENSE.txt<br>python/numpy-2.5.5/COPYING<br>python/numpy-2.5.5/LICENSE<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE.txt<br>python/numpy-2.5.5/LICENSE<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE.md<br>python/numpy-2.5.5/LICENSE.txt<br>python/numpy-2.5.5/LICENSE<br>python/numpy-2.5.5/LICENSE.md |
 | OpenMM | 8.6.1 | MIT AND LGPL-2.1 (CUDA/OpenCL platforms) | python/OpenMM-8.6.1/Licenses.txt<br>python/OpenMM-8.6.1/LGPL.txt |
 | pillow | 13.0.0 | MIT-CMU | python/pillow-13.0.0/LICENSE |
 | psutil | 7.2.2 | BSD-3-Clause | python/psutil-7.2.2/LICENSE |
+| pyberny | 0.7.0 | MPL-2.0 | python/pyberny-0.7.0/LICENSE |
 | pydantic | 2.14.4 | MIT | python/pydantic-2.14.4/LICENSE |
 | pydantic_core | 2.50.5 | MIT | python/pydantic_core-2.50.5/LICENSE |
 | pyscf | 2.15.1 | Apache-2.0 | python/pyscf-2.15.1/LICENSE<br>python/pyscf-2.15.1/NOTICE |
@@ -35,7 +40,6 @@ replaceable files.
 
 | Component | Version | Licence | Text |
 |---|---|---|---|
-| @babel/runtime | 7.29.15 | MIT | npm/_babel_runtime-7.29.15/LICENSE |
 | @floating-ui/core | 1.8.0 | MIT | npm/_floating-ui_core-1.8.0/LICENSE |
 | @floating-ui/dom | 1.8.0 | MIT | npm/_floating-ui_dom-1.8.0/LICENSE |
 | @floating-ui/react-dom | 2.1.9 | MIT | npm/_floating-ui_react-dom-2.1.9/LICENSE |
@@ -70,7 +74,6 @@ replaceable files.
 | @radix-ui/react-roving-focus | 1.2.1 | MIT | npm/_radix-ui_react-roving-focus-1.2.1/LICENSE |
 | @radix-ui/react-scroll-area | 1.4.0 | MIT | npm/_radix-ui_react-scroll-area-1.4.0/LICENSE |
 | @radix-ui/react-select | 2.4.1 | MIT | npm/_radix-ui_react-select-2.4.1/LICENSE |
-| @radix-ui/react-slider | 1.6.1 | MIT | npm/_radix-ui_react-slider-1.6.1/LICENSE |
 | @radix-ui/react-slot | 1.5.0 | MIT | npm/_radix-ui_react-slot-1.5.0/LICENSE |
 | @radix-ui/react-switch | 1.4.1 | MIT | npm/_radix-ui_react-switch-1.4.1/LICENSE |
 | @radix-ui/react-tabs | 1.2.1 | MIT | npm/_radix-ui_react-tabs-1.2.1/LICENSE |
@@ -99,8 +102,8 @@ replaceable files.
 | dompurify | 3.5.0 | (MPL-2.0 OR Apache-2.0) | npm/dompurify-3.5.0/LICENSE-MPL<br>npm/dompurify-3.5.0/LICENSE |
 | framer-motion | 11.18.2 | MIT | npm/framer-motion-11.18.2/LICENSE.md |
 | get-nonce | 1.0.1 | MIT | npm/get-nonce-1.0.1/LICENSE |
-| html-parse-stringify | 3.1.0 | MIT | npm/html-parse-stringify-3.1.0/LICENSE |
-| i18next | 24.2.3 | MIT | npm/i18next-24.2.3/LICENSE |
+| html-parse-stringify | 4.0.1 | MIT | npm/html-parse-stringify-4.0.1/LICENSE |
+| i18next | 27.2.6 | MIT | npm/i18next-27.2.6/LICENSE |
 | i18next-icu | 2.7.1 | MIT | npm/i18next-icu-2.7.1/LICENSE |
 | intl-messageformat | 10.7.18 | BSD-3-Clause | npm/intl-messageformat-10.7.18/LICENSE.md |
 | js-tokens | 4.0.0 | MIT | npm/js-tokens-4.0.0/LICENSE |
@@ -111,7 +114,7 @@ replaceable files.
 | motion-utils | 11.18.1 | MIT | npm/motion-utils-11.18.1/LICENSE.md |
 | react | 18.3.1 | MIT | npm/react-18.3.1/LICENSE |
 | react-dom | 18.3.1 | MIT | npm/react-dom-18.3.1/LICENSE |
-| react-i18next | 15.7.4 | MIT | npm/react-i18next-15.7.4/LICENSE |
+| react-i18next | 18.0.3 | MIT | npm/react-i18next-18.0.3/LICENSE |
 | react-remove-scroll | 2.7.2 | MIT | npm/react-remove-scroll-2.7.2/LICENSE |
 | react-remove-scroll-bar | 2.3.8 | MIT | common/MIT.txt |
 | react-style-singleton | 2.2.3 | MIT | npm/react-style-singleton-2.2.3/LICENSE |
@@ -121,8 +124,7 @@ replaceable files.
 | typescript | 5.9.3 | Apache-2.0 | npm/typescript-5.9.3/LICENSE.txt |
 | use-callback-ref | 1.3.3 | MIT | npm/use-callback-ref-1.3.3/LICENSE |
 | use-sidecar | 1.1.3 | MIT | npm/use-sidecar-1.1.3/LICENSE |
-| void-elements | 3.1.0 | MIT | npm/void-elements-3.1.0/LICENSE |
-| zod | 3.25.76 | MIT | npm/zod-3.25.76/LICENSE |
+| zod | 4.6.7 | MIT | npm/zod-4.6.7/LICENSE |
 | zustand | 5.1.0 | MIT | npm/zustand-5.1.0/LICENSE |
 
 ## Desktop shell (Rust)
@@ -575,15 +577,27 @@ replaceable files.
 | autodock-vina | 1.2.7 | Apache-2.0 | engines/autodock-vina-1.2.7/LICENSE |
 | llama.cpp | b12650 | MIT | engines/llama.cpp-b12650/LICENSE |
 | Qwen3-4B-Instruct-2507 | 2507 | Apache-2.0 | models/Qwen3-4B-Instruct-2507-2507/LICENSE |
-| xtb-dependency-dftd4 | bundled | see text | engines/xtb-dependency-dftd4-bundled/COPYING<br>engines/xtb-dependency-dftd4-bundled/COPYING.LESSER |
-| xtb-dependency-gcc-libs | bundled | see text | engines/xtb-dependency-gcc-libs-bundled/RUNTIME.LIBRARY.EXCEPTION<br>engines/xtb-dependency-gcc-libs-bundled/RUNTIME.LIBRARY.EXCEPTION.gomp_copy |
-| xtb-dependency-jonquil | bundled | see text | engines/xtb-dependency-jonquil-bundled/LICENSE-Apache<br>engines/xtb-dependency-jonquil-bundled/LICENSE-MIT |
-| xtb-dependency-libgfortran | bundled | see text | engines/xtb-dependency-libgfortran-bundled/RUNTIME.LIBRARY.EXCEPTION |
-| xtb-dependency-mctc-lib | bundled | see text | engines/xtb-dependency-mctc-lib-bundled/LICENSE |
-| xtb-dependency-multicharge | bundled | see text | engines/xtb-dependency-multicharge-bundled/LICENSE |
-| xtb-dependency-s-dftd3 | bundled | see text | engines/xtb-dependency-s-dftd3-bundled/COPYING<br>engines/xtb-dependency-s-dftd3-bundled/COPYING.LESSER |
-| xtb-dependency-tblite | bundled | see text | engines/xtb-dependency-tblite-bundled/COPYING<br>engines/xtb-dependency-tblite-bundled/COPYING.LESSER |
-| xtb-dependency-toml-f | bundled | see text | engines/xtb-dependency-toml-f-bundled/LICENSE-Apache<br>engines/xtb-dependency-toml-f-bundled/LICENSE-MIT |
-| mopac-dependency-gcc-libs | bundled | see text | engines/mopac-dependency-gcc-libs-bundled/RUNTIME.LIBRARY.EXCEPTION<br>engines/mopac-dependency-gcc-libs-bundled/RUNTIME.LIBRARY.EXCEPTION.gomp_copy |
-| mopac-dependency-libgfortran | bundled | see text | engines/mopac-dependency-libgfortran-bundled/RUNTIME.LIBRARY.EXCEPTION |
+| mopac/_openmp_mutex | 4.5 | BSD-3-Clause | engines/mopac/_openmp_mutex-4.5/LICENSE |
+| mopac/libblas | 3.11.0 | BSD-3-Clause | engines/mopac/libblas-3.11.0/LICENSE.txt |
+| mopac/libgcc | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 AND LGPL-2.1-or-later (libquadmath) | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt<br>common/LGPL-2.1-or-later.txt |
+| mopac/libgfortran | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt |
+| mopac/libgfortran5 | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt |
+| mopac/libgomp | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt |
+| mopac/liblapack | 3.11.0 | BSD-3-Clause | engines/mopac/liblapack-3.11.0/LICENSE.txt |
+| mopac/libopenblas | 0.3.34 | BSD-3-Clause | engines/mopac/libopenblas-0.3.34/LICENSE<br>engines/mopac/libopenblas-0.3.34/lapack-netlib/LICENSE |
+| xtb/_openmp_mutex | 4.5 | BSD-3-Clause | engines/xtb/_openmp_mutex-4.5/LICENSE |
+| xtb/dftd4 | 4.3.1 | LGPL-3.0-or-later | engines/xtb/dftd4-4.3.1/COPYING<br>engines/xtb/dftd4-4.3.1/COPYING.LESSER |
+| xtb/jonquil | 0.3.2 | Apache-2.0 OR MIT | engines/xtb/jonquil-0.3.2/LICENSE-Apache<br>engines/xtb/jonquil-0.3.2/LICENSE-MIT |
+| xtb/libblas | 3.11.0 | BSD-3-Clause | engines/xtb/libblas-3.11.0/LICENSE.txt |
+| xtb/libgcc | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 AND LGPL-2.1-or-later (libquadmath) | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt<br>common/LGPL-2.1-or-later.txt |
+| xtb/libgfortran | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt |
+| xtb/libgfortran5 | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt |
+| xtb/libgomp | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt |
+| xtb/liblapack | 3.11.0 | BSD-3-Clause | engines/xtb/liblapack-3.11.0/LICENSE.txt |
+| xtb/libopenblas | 0.3.34 | BSD-3-Clause | engines/xtb/libopenblas-0.3.34/LICENSE<br>engines/xtb/libopenblas-0.3.34/lapack-netlib/LICENSE |
+| xtb/mctc-lib | 0.7.0 | Apache-2.0 | engines/xtb/mctc-lib-0.7.0/LICENSE |
+| xtb/multicharge | 0.6.0 | Apache-2.0 | engines/xtb/multicharge-0.6.0/LICENSE |
+| xtb/simple-dftd3 | 1.7.0 | LGPL-3.0-or-later | engines/xtb/simple-dftd3-1.7.0/COPYING<br>engines/xtb/simple-dftd3-1.7.0/COPYING.LESSER |
+| xtb/tblite | 0.8.0 | LGPL-3.0-or-later | engines/xtb/tblite-0.8.0/COPYING<br>engines/xtb/tblite-0.8.0/COPYING.LESSER |
+| xtb/toml-f | 0.5.2 | Apache-2.0 OR MIT | engines/xtb/toml-f-0.5.2/LICENSE-Apache<br>engines/xtb/toml-f-0.5.2/LICENSE-MIT |
 | IBM-Plex-Sans-Thai | 1.1.0 | OFL-1.1 | fonts/IBM-Plex-Sans-Thai-1.1.0/OFL.txt |

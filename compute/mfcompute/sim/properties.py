@@ -33,6 +33,7 @@ from ..jobs import JobContext
 from ..models import MdParams, PropertiesParams
 from ..rpc import RpcError
 from . import dft, forcefield, md, mopac, thermo, xtb
+from .notes import Notes, single
 
 LIMITS = {
     #            xtb opt, xtb hess, pm7, dft heavy atoms, dft polarisability heavy atoms
@@ -89,7 +90,7 @@ def _surface_and_shape(mol: Chem.Mol) -> dict[str, dict[str, Any]]:
 def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
     started = time.perf_counter()
     limits = LIMITS[params.level]
-    warnings: list[str] = []
+    notes = Notes()
     failed_steps: list[str] = []
     methods_used: list[str] = []
     ctx.progress(1, "prepare", "Preparing structure", force=True)
@@ -104,7 +105,9 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
         if row:
             cached = json.loads(row[0])
             cached["jobId"] = ctx.job_id
-            cached["warnings"] = [*cached.get("warnings", []), "Result served from the local cache (same InChIKey and method)."]
+            served = single("cached")
+            cached["warnings"] = [*cached.get("warnings", []), *served["warnings"]]
+            cached["warningCodes"] = [*cached.get("warningCodes", []), *served["warningCodes"]]
             ctx.progress(100, "done", "Loaded cached result", force=True)
             result_cached: dict[str, Any] = cached
             return result_cached
@@ -159,16 +162,16 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
                     props["gibbsFreeEnergy"] = _pv(thermochem["gibbsFreeEnergy"]["value"], "Eh", "GFN2-xTB + quasi-RRHO")
                     props["enthalpy"] = _pv(thermochem["enthalpy"]["value"], "Eh", "GFN2-xTB + RRHO")
                 if props["imaginaryFrequencyCount"]["value"]:
-                    warnings.append("Imaginary frequencies found: the structure is not a true minimum at the GFN2-xTB level.")
+                    notes.add("imaginaryFrequencies")
             elif limits["hess"]:
-                warnings.append(f"Vibrational analysis skipped: {n_atoms} atoms exceeds the {params.level} limit of {limits['hess']}.")
+                notes.add("hessianSizeLimit", atoms=n_atoms, level=params.level, limit=limits["hess"])
         except RpcError as err:
             if err.code == -32000:
                 raise
-            warnings.append(f"GFN2-xTB step skipped: {err.message}")
+            notes.add("xtbFailed", reason=err.message)
             failed_steps.append("GFN2-xTB")
     elif not xtb.supports(mol):
-        warnings.append("GFN2-xTB covers H–Rn only; tight-binding properties were not computed.")
+        notes.add("xtbElements")
 
     if limits["pm7"] and mopac.available() and mopac.supports(mol) and n_atoms <= limits["pm7"]:
         try:
@@ -177,7 +180,7 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
         except RpcError as err:
             if err.code == -32000:
                 raise
-            warnings.append(f"PM7 heat of formation unavailable: {err.message}")
+            notes.add("pm7Failed", reason=err.message)
             failed_steps.append("PM7")
 
     if limits["dft"] and dft.supported(mol) and n_heavy <= limits["dft"]:
@@ -201,15 +204,17 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
                 props["polarizabilityTensor"] = _pv([[round(v * dft.AU_POL_TO_A3, 4) for v in row] for row in res["polarizability"]["tensorAu"]],
                                                     "Å³", dft.METHOD)
             if not res["converged"]:
-                warnings.append("DFT SCF did not fully converge; DFT values are approximate.")
+                notes.add("dftNotConverged")
             methods_used.append(dft.METHOD)
         except RpcError as err:
             if err.code == -32000:
                 raise
-            warnings.append(f"DFT step skipped: {err.message}")
+            notes.add("dftFailed", reason=err.message)
             failed_steps.append("DFT")
+    elif limits["dft"] and not dft.available():
+        notes.add("dftUnavailable")
     elif limits["dft"] and n_heavy > limits["dft"]:
-        warnings.append(f"DFT skipped: {n_heavy} heavy atoms exceeds the {params.level} limit of {limits['dft']}; tight-binding values are reported.")
+        notes.add("dftSizeLimit", heavy=n_heavy, level=params.level, limit=limits["dft"])
 
     ctx.progress(93, "surface", "Surface area, volume and shape")
     props.update(_surface_and_shape(mol))
@@ -235,7 +240,7 @@ def run(params: PropertiesParams, ctx: JobContext) -> dict[str, Any]:
         "durationMs": int((time.perf_counter() - started) * 1000),
         "geometry": geometry_out,
         "properties": props,
-        "warnings": warnings,
+        **notes.as_result(),
         "data": {**data, "methods": methods_used, "geometryMethod": geometry_method},
     }
     # A result in which an engine failed (rather than being skipped by a size limit) is not

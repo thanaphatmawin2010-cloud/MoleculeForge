@@ -9,6 +9,8 @@ import { defineConfig } from "@playwright/test";
  * scripts/launch_check.py (cold start and the offline socket check over the whole process tree).
  */
 const token = `e2e-${Date.now().toString(36)}`;
+// The browser preinstalled in the development container; CI sets PW_CHROMIUM="" to use Playwright's own.
+const chromium = process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium";
 const dataDir = mkdtempSync(join(tmpdir(), "moleculeforge-e2e-"));
 process.env.MF_E2E_TOKEN = token;
 
@@ -22,7 +24,7 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:5173/?bridgePort=8766&bridgeToken=${token}`,
     viewport: { width: 1440, height: 900 },
     trace: "off",
-    launchOptions: { executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium" },
+    launchOptions: chromium ? { executablePath: chromium } : {},
   },
   webServer: [
     {

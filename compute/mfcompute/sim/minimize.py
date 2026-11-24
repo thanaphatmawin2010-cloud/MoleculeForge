@@ -14,6 +14,7 @@ from ..jobs import JobContext
 from ..models import MinimizeParams
 from ..rpc import ENGINE_UNAVAILABLE, RpcError
 from . import forcefield, openmm_mmff, xtb
+from .notes import Notes
 
 OPENMM_THRESHOLD = 1500  # atoms; larger MMFF systems minimise on OpenMM (cutoffs, multithreaded/GPU)
 
@@ -32,7 +33,7 @@ def run(params: MinimizeParams, ctx: JobContext) -> dict[str, Any]:
     if method == "auto":
         method = forcefield.choose_force_field(mol)
     properties: dict[str, dict[str, Any]] = {}
-    warnings: list[str] = []
+    notes = Notes()
     engine = "RDKit"
     converged = False
     if method in ("GFN2-xTB", "GFN-FF"):
@@ -58,7 +59,7 @@ def run(params: MinimizeParams, ctx: JobContext) -> dict[str, Any]:
         properties["gradientRms"] = {"value": round(result.gradient_rms, 6), "unit": "kcal/(mol·Å)", "method": method}
         properties["iterations"] = {"value": result.iterations, "unit": "", "method": "RDKit BFGS"}
         if not converged:
-            warnings.append(f"Stopped after {params.maxSteps} steps before reaching the gradient tolerance.")
+            notes.add("minimizeStepLimit", steps=params.maxSteps)
     geometry = convert.from_rdkit(mol, mol_id=params.molecule.id, name=params.molecule.name,
                                   source=params.molecule.meta.source, props=params.molecule.props,
                                   category=params.molecule.meta.category)
@@ -73,7 +74,7 @@ def run(params: MinimizeParams, ctx: JobContext) -> dict[str, Any]:
         "durationMs": int((time.perf_counter() - started) * 1000),
         "geometry": geometry,
         "properties": properties,
-        "warnings": warnings,
+        **notes.as_result(),
     }
 
 

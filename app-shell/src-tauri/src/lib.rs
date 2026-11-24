@@ -1,7 +1,7 @@
 //! MoleculeForge desktop shell (Tauri 2).
 //!
 //! Responsibilities: host the bundled UI, run the compute sidecar over stdio, relay validated
-//! JSON-RPC between them, and mediate file dialogs. The web view gets exactly three commands
+//! JSON-RPC between them, and mediate file dialogs. The web view gets exactly four commands
 //! (see capabilities/main.json) and no filesystem, shell or network access of its own.
 
 mod files;
@@ -18,8 +18,12 @@ static STARTED: OnceLock<Instant> = OnceLock::new();
 static INTERACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
-fn rpc_send(line: String, state: State<'_, SidecarState>) -> Result<(), String> {
+fn rpc_send(line: String, state: State<'_, SidecarState>, picked: State<'_, files::PickedModel>) -> Result<(), String> {
     sidecar::validate_request(&line)?;
+    {
+        let chosen = picked.0.lock().map_err(|_| "model state poisoned")?;
+        sidecar::check_model_path(&line, chosen.as_deref())?;
+    }
     // Performance probe (§10 cold start): the UI asks for capabilities as soon as the engine is
     // ready, which is when the app becomes interactive. Reported only when MF_STARTUP_PROBE is set.
     if !INTERACTIVE.load(Ordering::Relaxed) && line.contains("\"system.capabilities\"") && std::env::var_os("MF_STARTUP_PROBE").is_some() {
@@ -36,7 +40,8 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState::default())
-        .invoke_handler(tauri::generate_handler![rpc_send, files::open_text_file, files::save_file])
+        .manage(files::PickedModel::default())
+        .invoke_handler(tauri::generate_handler![rpc_send, files::open_text_file, files::save_file, files::choose_model])
         .setup(|app| {
             #[cfg(debug_assertions)]
             if std::env::var_os("MF_DEVTOOLS").is_some() {

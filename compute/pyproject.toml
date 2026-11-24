@@ -9,7 +9,8 @@ authors = [{ name = "MoleculeForge contributors" }]
 dependencies = [
     "rdkit==2026.9.2",
     "openmm==8.6.1",
-    "pyscf==2.15.1",
+    # PySCF (and its PyBerny optimiser) are not published for Windows; DFT is reported unavailable there.
+    "pyscf==2.15.1; sys_platform != 'win32'",
     "numpy>=2.1,<3",
     "scipy>=1.14,<2",
     "pydantic>=2.10,<3",
@@ -18,7 +19,7 @@ dependencies = [
     "meeko==0.8.0",
     "gemmi>=0.7,<0.8",
     "uharfbuzz>=0.50",
-    "geometric>=1.1",
+    "pyberny>=0.6.3; sys_platform != 'win32'",
 ]
 
 [dependency-groups]
@@ -66,7 +67,7 @@ exclude = ["build/", "dist/"]
 # most descriptor functions): treated as untyped at the boundary; our own code stays strict.
 module = ["rdkit", "rdkit.*", "openmm", "openmm.*", "pyscf", "pyscf.*", "scipy", "scipy.*", "meeko", "meeko.*",
           "reportlab", "reportlab.*", "psutil", "psutil.*", "mendeleev", "mendeleev.*", "gemmi", "gemmi.*",
-          "geometric", "geometric.*", "uharfbuzz"]
+          "berny", "berny.*", "molsym", "molsym.*", "uharfbuzz"]
 ignore_missing_imports = true
 follow_imports = "skip"
 

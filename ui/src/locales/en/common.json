@@ -22,6 +22,15 @@
     },
     "disclaimer": "Answers come from a local model and quote values computed by MoleculeForge's tools. Check important results before relying on them.",
     "intro": "Ask about the molecule on the canvas, an element or a result. Every number comes from MoleculeForge's own calculations, with the method named.",
+    "model": {
+      "changed": "Now using {model}",
+      "checking": "Checking the local model…",
+      "choose": "Choose a model file…",
+      "failed": "Could not load that model",
+      "hint": "Any GGUF model on this computer can be used. Larger models answer better but need more memory.",
+      "menu": "Language model",
+      "useBundled": "Use the bundled model ({model})"
+    },
     "offline": "Runs entirely on this computer. Nothing is sent online.",
     "placeholder": "Ask about this molecule…",
     "runningOn": "{model} · {device}",
@@ -144,8 +153,8 @@
     "unknown": "Unknown"
   },
   "error": {
-    "title": "This part of the app hit an error",
-    "retry": "Try again"
+    "retry": "Try again",
+    "title": "This part of the app hit an error"
   },
   "history": {
     "addAtom": "Add atom",
@@ -531,6 +540,21 @@
     "dark": "Switch to dark theme",
     "language": "Language",
     "light": "Switch to light theme"
+  },
+  "simWarning": {
+    "cached": "Result served from the local cache (same InChIKey and method).",
+    "dftFailed": "DFT step skipped: {reason}",
+    "dftNotConverged": "DFT SCF did not fully converge; DFT values are approximate.",
+    "dftSizeLimit": "DFT skipped: {heavy, plural, one {# heavy atom exceeds} other {# heavy atoms exceed}} the {level, select, fast {Fast} standard {Standard} thorough {Thorough} other {{level}}} limit of {limit, number}; tight-binding values are reported.",
+    "dftUnavailable": "DFT skipped: PySCF is not available on this platform; tight-binding values are reported.",
+    "dockingEstimate": "Educational/research estimate: rigid receptor, empirical scoring (typical error ≈ 2–3 kcal/mol), no explicit solvent.",
+    "hessianSizeLimit": "Vibrational analysis skipped: {atoms, plural, one {# atom exceeds} other {# atoms exceed}} the {level, select, fast {Fast} standard {Standard} thorough {Thorough} other {{level}}} limit of {limit, number}.",
+    "imaginaryFrequencies": "Imaginary frequencies found: the structure is not a true minimum at the GFN2-xTB level.",
+    "mdGasPhase": "Gas-phase single-molecule dynamics; averages are canonical-ensemble estimates with block-averaged uncertainties.",
+    "minimizeStepLimit": "Stopped after {steps, plural, one {# step} other {# steps}} before reaching the gradient tolerance.",
+    "pm7Failed": "PM7 heat of formation unavailable: {reason}",
+    "xtbElements": "GFN2-xTB covers H–Rn only; tight-binding properties were not computed.",
+    "xtbFailed": "GFN2-xTB step skipped: {reason}"
   },
   "simulate": {
     "auto": "Automatic",

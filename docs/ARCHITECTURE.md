@@ -20,7 +20,7 @@ runs the chemistry and simulation work.
      ├─ RDKit (in process): parsing, sanitisation, validation, descriptors, MMFF94/UFF, ETKDG
      ├─ OpenMM (in process): MMFF94 as custom forces, Langevin dynamics, CPU/OpenCL/CUDA
      ├─ PySCF (spawned worker process): B3LYP single points, finite-field polarisability,
-     │     B3LYP geometry optimisation (geomeTRIC) for one-heavy-atom hydrides
+     │     B3LYP geometry optimisation (PyBerny) for one-heavy-atom hydrides
      ├─ xtb 6.8 (subprocess): GFN2-xTB / GFN-FF optimisation, Hessians, charges
      ├─ MOPAC 23 (subprocess): PM7 heats of formation
      ├─ AutoDock Vina 1.2.7 (subprocess) + Meeko: docking
@@ -29,9 +29,10 @@ runs the chemistry and simulation work.
 
 ## Process model and protocol
 
-* **UI ↔ shell.** The web view can call exactly three commands (`rpc_send`, `open_text_file`,
-  `save_file`) and listen to events. Nothing else is granted (see
-  `app-shell/src-tauri/capabilities/main.json`). The page is served from the bundle with a strict
+* **UI ↔ shell.** The web view can call exactly four commands (`rpc_send`, `open_text_file`,
+  `save_file`, `choose_model`) and listen to events. Nothing else is granted (see
+  `app-shell/src-tauri/capabilities/main.json`). `choose_model` opens a native dialog for a GGUF
+  file; `ai.configure` is then accepted only with that exact path. The page is served from the bundle with a strict
   Content-Security-Policy whose `connect-src` allows only the Tauri IPC origin.
 * **Shell ↔ sidecar.** The shell spawns the sidecar with `MF_RESOURCE_DIR` (bundled engines and data)
   and `MF_DATA_DIR` (per-user state), relays one JSON-RPC request per line to its stdin, and forwards

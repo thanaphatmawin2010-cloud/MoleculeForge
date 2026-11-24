@@ -110,6 +110,7 @@ class SimulationResult(Strict):
     geometry: Molecule
     properties: dict[str, PropertyValue]
     warnings: list[str] = Field(default_factory=list)
+    warningCodes: list[dict[str, Any]] = Field(default_factory=list)
     data: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -293,6 +294,7 @@ class AiQueryParams(Strict):
 
 
 class AiConfigParams(Strict):
-    modelPath: str | None = None
+    modelPath: str | None = Field(default=None, max_length=4096)
+    useDefault: bool = False
     contextSize: int = Field(default=8192, ge=2048, le=131072)
     gpuLayers: int | None = None

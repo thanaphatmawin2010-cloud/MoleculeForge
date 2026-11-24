@@ -4,10 +4,12 @@
 //! one file the user picked (opened files are treated as untrusted input and size-limited before
 //! the sidecar parses them defensively), or a yes/no for a save the user confirmed.
 
+use std::io::Read;
 use std::path::Path;
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 /// Molecule files larger than this are refused (the largest supported structures are far smaller).
@@ -90,6 +92,42 @@ pub async fn save_file(app: AppHandle, default_name: String, bytes: Vec<u8>, fil
     let path = into_path(picked)?;
     std::fs::write(&path, &bytes).map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     Ok(true)
+}
+
+/// The language-model file the user last picked in the native dialog. `ai.configure` may only
+/// name this exact path, so the web view cannot point the model runtime at any other file.
+#[derive(Default)]
+pub struct PickedModel(pub Mutex<Option<String>>);
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelChoice {
+    name: String,
+    path: String,
+    size_bytes: u64,
+}
+
+/// True when the file starts with the GGUF magic number.
+pub fn is_gguf(path: &Path) -> bool {
+    let mut magic = [0u8; 4];
+    std::fs::File::open(path).and_then(|mut f| f.read_exact(&mut magic)).is_ok() && &magic == b"GGUF"
+}
+
+#[tauri::command]
+pub async fn choose_model(app: AppHandle, picked: State<'_, PickedModel>) -> Result<Option<ModelChoice>, String> {
+    let dialog = app.dialog().file().add_filter("GGUF language model", &["gguf"]);
+    let Some(file) = dialog.blocking_pick_file() else { return Ok(None) };
+    let path = into_path(file)?;
+    let path = path.canonicalize().map_err(|e| format!("cannot read the model: {e}"))?;
+    let meta = std::fs::metadata(&path).map_err(|e| format!("cannot read the model: {e}"))?;
+    let gguf_extension = path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("gguf"));
+    if !meta.is_file() || !gguf_extension || !is_gguf(&path) {
+        return Err("the file is not a GGUF language model".into());
+    }
+    let path_text = path.to_str().ok_or("the model path is not valid Unicode")?.to_string();
+    *picked.0.lock().map_err(|_| "model state poisoned")? = Some(path_text.clone());
+    let name = path.file_stem().and_then(|n| n.to_str()).unwrap_or("model").to_string();
+    Ok(Some(ModelChoice { name, path: path_text, size_bytes: meta.len() }))
 }
 
 #[cfg(test)]

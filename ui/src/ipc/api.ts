@@ -232,20 +232,20 @@ export const api = {
       { report, format, locale, strings },
       z.object({ format: z.string(), data: z.string(), encoding: z.enum(["utf-8", "base64"]), filename: z.string() }),
     ),
-  aiStatus: () =>
-    rpc().call(
-      "ai.status",
-      {},
-      z.object({
-        available: z.boolean(),
-        running: z.boolean(),
-        model: z.object({ path: z.string().nullable(), name: z.string().nullable(), sizeBytes: z.number().nullable() }),
-        contextSize: z.number(),
-        accelerator: z.string(),
-        offloadLayers: z.number(),
-      }),
-    ),
+  aiStatus: () => rpc().call("ai.status", {}, AiStatusSchema),
+  aiConfigure: (config: { modelPath?: string; useDefault?: boolean }) => rpc().call("ai.configure", config, AiStatusSchema),
 };
+
+export const AiStatusSchema = z.object({
+  available: z.boolean(),
+  running: z.boolean(),
+  model: z.object({ path: z.string().nullable(), name: z.string().nullable(), sizeBytes: z.number().nullable(), bundled: z.boolean() }),
+  bundledModel: z.string().nullable(),
+  contextSize: z.number(),
+  accelerator: z.string(),
+  offloadLayers: z.number(),
+});
+export type AiStatus = z.infer<typeof AiStatusSchema>;
 
 export const AiAnswerSchema = z.object({
   answer: z.string(),

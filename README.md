@@ -57,7 +57,7 @@ compute/.venv/bin/python scripts/stage_resources.py
 ```
 
 ```bash
-cd app-shell/src-tauri && npx --prefix ../../ui tauri build
+pnpm tauri build
 ```
 
 `fetch_engines.py` downloads and verifies everything pinned in `scripts/engines.lock.json`: xtb,
@@ -69,7 +69,7 @@ sets, run `scripts/build_elements.py` (needs the `data` dependency group) and
 ### Run in development
 
 ```bash
-cd app-shell/src-tauri && npx --prefix ../../ui tauri dev
+pnpm tauri dev
 ```
 
 A debug build of the shell runs the sidecar from `compute/.venv`. To work on the UI in a browser,

@@ -30,6 +30,15 @@ export async function openTextFile(filters: FileFilter[]): Promise<{ name: strin
   });
 }
 
+/** The model chooser needs the desktop shell: it remembers the pick so only that file can be loaded. */
+export const canChooseModel = (): boolean => isTauri();
+
+export async function chooseModelFile(): Promise<{ name: string; path: string; sizeBytes: number } | null> {
+  if (!isTauri()) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<{ name: string; path: string; sizeBytes: number } | null>("choose_model");
+}
+
 export async function saveFile(defaultName: string, data: string | Uint8Array, filters: FileFilter[]): Promise<boolean> {
   if (isTauri()) {
     const { invoke } = await import("@tauri-apps/api/core");

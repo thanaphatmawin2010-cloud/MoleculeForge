@@ -329,8 +329,15 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
         }
     final_method = "GFN2-xTB" if use_xtb else str(ff_name)
     # Tiny molecules get a B3LYP geometry: GFN2-xTB is too coarse there (water opens to 107°).
-    if refine == "auto" and dft.can_optimize(rd_h):
-        final_method = DFT_FINAL
+    # Where PySCF is not installed (Windows) they keep the force-field geometry, which is closer to
+    # experiment for these hydrides than GFN2-xTB.
+    dft_unavailable = False
+    if refine == "auto" and dft.tiny_hydride(rd_h):
+        if dft.can_optimize_here():
+            final_method = DFT_FINAL
+        elif ff_name is not None:
+            final_method = str(ff_name)
+            dft_unavailable = True
     if refine == "gfn2-xtb" and final_method != "GFN2-xTB":
         methods.append({"stage": "refine", "method": "GFN2-xTB", "details": "skipped: engine unavailable or element outside H–Rn"})
     if ff_name is None:
@@ -370,6 +377,9 @@ def repair(molecule: Molecule, *, refine: str, force_field: str, ctx: JobContext
         methods.append({"stage": "refine", "method": "GFN2-xTB (ANC optimiser, tight)",
                         "details": f"{total_cycles} cycles, converged={xtb_result.converged}"})
 
+    if dft_unavailable:
+        methods.append({"stage": "refine", "method": dft.OPT_METHOD,
+                        "details": f"skipped: PySCF is not available on this platform; {ff_name} geometry kept"})
     dft_result: dict[str, Any] | None = None
     if final_method == DFT_FINAL:
         dft_result = dft.optimize(rd_h, ctx, threads=capabilities.recommended_threads(), percent_from=60, percent_to=95, stage="refine")

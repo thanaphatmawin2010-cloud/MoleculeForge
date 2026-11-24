@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEST = ROOT / "app-shell" / "src-tauri" / "resources"
 LOCK = json.loads((ROOT / "scripts" / "engines.lock.json").read_text(encoding="utf-8"))
 sys.path.insert(0, str(ROOT / "scripts"))
-from fetch_engines import platform_key  # noqa: E402
+from fetch_engines import model_spec, platform_key  # noqa: E402
 
 
 def link_or_copy(src: Path, dst: Path) -> None:
@@ -71,8 +71,9 @@ def main() -> int:
     for name in ("elements.json", "molecules/library.json"):
         link_or_copy(ROOT / "data" / name, DEST / "data" / name)
     if not opts.without_model:
-        model = ROOT / "data" / "models" / LOCK["model"]["file"]
-        if not model.exists() or model.stat().st_size != LOCK["model"]["size"]:
+        spec = model_spec(plat)
+        model = ROOT / "data" / "models" / str(spec["file"])
+        if not model.exists() or model.stat().st_size != spec["size"]:
             raise SystemExit("language model missing or incomplete: run scripts/fetch_engines.py --only model")
         link_or_copy(model, DEST / "data" / "models" / model.name)
     total = sum(p.stat().st_size for p in DEST.rglob("*") if p.is_file() and not p.is_symlink())

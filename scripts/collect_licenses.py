@@ -42,8 +42,6 @@ FETCHED = [
         "https://raw.githubusercontent.com/ccsb-scripps/AutoDock-Vina/v1.2.7/LICENSE"]),
     ("engines", "llama.cpp", "b12650", "MIT", [
         "https://raw.githubusercontent.com/ggml-org/llama.cpp/b12650/LICENSE"]),
-    ("models", "Qwen3-4B-Instruct-2507", "2507", "Apache-2.0", [
-        "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/raw/main/LICENSE"]),
 ]
 # The OpenMM wheel ships no licence file; these are the texts in its source tree at the pinned tag.
 PYTHON_EXTRA = {
@@ -52,6 +50,9 @@ PYTHON_EXTRA = {
 }
 # Canonical texts for SPDX ids used by components that do not ship their own licence file.
 SPDX_TEXT = "https://raw.githubusercontent.com/spdx/license-list-data/v3.26.0/text/{id}.txt"
+# conda-forge's libgcc package also carries libquadmath, which upstream GCC licenses under the LGPL
+# (shipped as a replaceable shared library).
+CONDA_EXTRA_LICENCE = {"libgcc": " AND LGPL-2.1-or-later (libquadmath)"}
 
 
 def fetch(url: str, dest: Path) -> None:
@@ -177,9 +178,19 @@ def cargo_entries() -> list[Entry]:
     return entries
 
 
+def model_entry() -> tuple[str, str, str, str, list[str]]:
+    """The language model bundled for this platform (engines.lock.json, modelByPlatform)."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from fetch_engines import model_spec, platform_key
+
+    spec = model_spec(platform_key())
+    return ("models", str(spec["name"]), f"{spec['quantization']} {str(spec['revision'])[:12]}", str(spec["license"]),
+            [str(spec["licenseUrl"])])
+
+
 def fetched_entries() -> list[Entry]:
     entries = []
-    for group, name, version, lic, urls in FETCHED:
+    for group, name, version, lic, urls in [*FETCHED, model_entry()]:
         entry = Entry(group, name, version, lic, source=", ".join(urls))
         target = OUT / group / f"{safe(name)}-{safe(version)}"
         target.mkdir(parents=True, exist_ok=True)
@@ -188,12 +199,25 @@ def fetched_entries() -> list[Entry]:
             fetch(url, dest)
             entry.files.append(str(dest.relative_to(OUT)))
         entries.append(entry)
-    # Dependency licences that ship inside the conda-built engines.
-    for engine in ("xtb", "mopac"):
-        base = ROOT / "engines" / "linux-x64" / engine / "share" / "licenses"
-        for sub in sorted(p for p in base.glob("*") if p.is_dir()):
-            entry = Entry("engines", f"{engine}-dependency-{sub.name}", "bundled", "see text", source=f"conda-forge ({engine})")
-            copy_texts(entry, sorted(sub.iterdir()))
+    # Every conda package inside the conda-built engines, runtime libraries included, with the
+    # licence files from its package metadata (fetch_engines.bundle_conda_licences puts them there).
+    # Packages that ship no file get the canonical SPDX texts in main().
+    for prefix in sorted(p for p in (ROOT / "engines").glob("*/*") if (p / "conda-meta").is_dir()):
+        for record_path in sorted((prefix / "conda-meta").glob("*.json")):
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+            if record["name"] == prefix.name:
+                continue  # the engine itself is listed above, with the texts from its release tag
+            lic = record.get("license") or "see text"
+            lic += CONDA_EXTRA_LICENCE.get(record["name"], "")
+            entry = Entry("engines", f"{prefix.name}/{record['name']}", record["version"], lic,
+                          source=f"conda-forge {record['name']} {record['version']} {record.get('build', '')}".strip())
+            texts = prefix / "share" / "licenses" / "conda" / record["name"]
+            target = OUT / "engines" / safe(prefix.name) / f"{safe(record['name'])}-{safe(record['version'])}"
+            for path in sorted(p for p in texts.rglob("*") if p.is_file()):
+                dest = target / path.relative_to(texts)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, dest)
+                entry.files.append(str(dest.relative_to(OUT)))
             entries.append(entry)
     fonts = ROOT / "data" / "fonts" / "OFL.txt"
     font = Entry("fonts", "IBM-Plex-Sans-Thai", "1.1.0", "OFL-1.1", source="@ibm/plex-sans-thai 1.1.0 (PDF reports)")
@@ -210,9 +234,12 @@ def main() -> int:
               ("Desktop shell (Rust)", cargo_entries()), ("Engines, model and fonts", fetched_entries())]
     lines = ["# Third-party notices", "",
              "MoleculeForge bundles the components below. Each directory holds the licence text(s) as",
-             "published by the project at the shipped version. GPL-licensed code is not linked into any",
-             "MoleculeForge binary; LGPL components (xtb, Meeko) run as separate processes or ship as",
-             "replaceable files.", ""]
+             "published by the project at the shipped version; where a package ships none, the canonical",
+             "SPDX text is in `common/`. GPL-licensed code is not linked into any MoleculeForge binary:",
+             "the GCC runtime libraries used by the engines carry the GCC Runtime Library Exception and",
+             "the PyInstaller bootloader its own exception. LGPL components (xtb with dftd4, s-dftd3 and",
+             "tblite; Meeko; libquadmath; OpenMM's GPU platforms) run as separate processes or ship as",
+             "replaceable files: Meeko as plain Python source in the sidecar's `_internal/meeko/`.", ""]
     # Components without their own file: attach the canonical SPDX text of every licence they name.
     for _, entries in groups:
         for e in entries:

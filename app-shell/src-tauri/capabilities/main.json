@@ -1,13 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The only window: may call the three MoleculeForge commands and listen for sidecar events. No filesystem, shell, HTTP or process access is exposed to the web view.",
+  "description": "The only window: may call the four MoleculeForge commands and listen for sidecar events. No filesystem, shell, HTTP or process access is exposed to the web view.",
   "windows": ["main"],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "allow-rpc-send",
     "allow-open-text-file",
-    "allow-save-file"
+    "allow-save-file",
+    "allow-choose-model"
   ]
 }

@@ -3,7 +3,7 @@ fn main() {
     // grant exactly these and nothing else.
     tauri_build::try_build(
         tauri_build::Attributes::new()
-            .app_manifest(tauri_build::AppManifest::new().commands(&["rpc_send", "open_text_file", "save_file"])),
+            .app_manifest(tauri_build::AppManifest::new().commands(&["rpc_send", "open_text_file", "save_file", "choose_model"])),
     )
     .expect("failed to run tauri-build");
 }

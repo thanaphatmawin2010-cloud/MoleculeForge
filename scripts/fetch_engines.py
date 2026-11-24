@@ -98,8 +98,13 @@ def download(url: str, dest: Path, expected_size: int | None = None, attempts: i
     raise SystemExit(f"failed to download {url}")
 
 
-def fetch_model() -> None:
-    spec = LOCK["model"]
+def model_spec(plat: str) -> dict[str, object]:
+    """The model bundled for a platform: the default, unless engines.lock.json overrides it."""
+    return {**LOCK["model"], **LOCK.get("modelByPlatform", {}).get(plat, {})}
+
+
+def fetch_model(plat: str) -> None:
+    spec = model_spec(plat)
     dest = ROOT / "data" / "models" / spec["file"]
     if dest.exists() and dest.stat().st_size == spec["size"] and sha256_of(dest) == spec["sha256"]:
         log(f"model already present and verified: {dest.name}")
@@ -200,22 +205,53 @@ def fetch_conda_engine(plat: str, name: str) -> None:
     spec = LOCK[name]
     prefix = ROOT / "engines" / plat / name
     marker = prefix / "conda-meta"
-    if marker.exists() and any(p.name.startswith(f"{name}-") for p in marker.iterdir()):
-        log(f"{name} prefix already present")
-        return
     exe = micromamba(plat)
     env = dict(os.environ, MAMBA_ROOT_PREFIX=str(ROOT / "engines" / ".mamba-root"))
-    cmd = [str(exe), "create", "--yes", "--prefix", str(prefix), "--override-channels",
-           "--channel", spec["channel"], spec["conda_spec"], "--platform", CONDA_SUBDIR[plat]]
-    log(f"creating {name} prefix: " + " ".join(cmd[1:]))
-    subprocess.run(cmd, check=True, env=env)
-    # Trim headers, static archives and docs that are never used at runtime.
-    for sub in ("include", "share/man", "share/doc", "share/info", "conda-meta/history"):
-        target = prefix / sub
-        if target.is_dir():
-            shutil.rmtree(target, ignore_errors=True)
-    for static in prefix.rglob("*.a"):
-        static.unlink()
+    if marker.exists() and any(p.name.startswith(f"{name}-") for p in marker.iterdir()):
+        log(f"{name} prefix already present")
+    else:
+        cmd = [str(exe), "create", "--yes", "--prefix", str(prefix), "--override-channels",
+               "--channel", spec["channel"], spec["conda_spec"], "--platform", CONDA_SUBDIR[plat]]
+        log(f"creating {name} prefix: " + " ".join(cmd[1:]))
+        subprocess.run(cmd, check=True, env=env)
+        # Trim headers, static archives and docs that are never used at runtime.
+        for sub in ("include", "share/man", "share/doc", "share/info", "conda-meta/history"):
+            target = prefix / sub
+            if target.is_dir():
+                shutil.rmtree(target, ignore_errors=True)
+        for static in prefix.rglob("*.a"):
+            static.unlink()
+    bundle_conda_licences(exe, prefix, env)
+
+
+def bundle_conda_licences(exe: Path, prefix: Path, env: dict[str, str]) -> None:
+    """Copy each installed package's licence files into <prefix>/share/licenses/conda/<package>/.
+
+    conda keeps them in the package's info/licenses, which is not part of an installed prefix, so
+    each package is fetched again (verified against the sha256 recorded in conda-meta) and only its
+    info/ directory is read. This is what puts the OpenBLAS, LAPACK and GCC runtime licences next to
+    the libraries that ship with the engine.
+    """
+    for record_path in sorted((prefix / "conda-meta").glob("*.json")):
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        dest = prefix / "share" / "licenses" / "conda" / record["name"]
+        if dest.is_dir():
+            continue
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / record["url"].rsplit("/", 1)[-1]
+            download(record["url"], archive)
+            if sha256_of(archive) != record["sha256"]:
+                raise SystemExit(f"checksum mismatch for {archive.name}")
+            unpacked = Path(tmp) / "unpacked"
+            subprocess.run([str(exe), "package", "extract", str(archive), str(unpacked)], check=True, env=env,
+                           stdout=subprocess.DEVNULL)
+            licences = unpacked / "info" / "licenses"
+            dest.mkdir(parents=True)
+            if licences.is_dir():
+                shutil.copytree(licences, dest, dirs_exist_ok=True)
+        shipped = sum(1 for p in dest.rglob("*") if p.is_file())
+        note = f"{shipped} file(s)" if shipped else "none in the package; collect_licenses.py adds the SPDX text"
+        log(f"licences for {record['name']} {record['version']} ({record.get('license', '?')}): {note}")
 
 
 def fetch_vina(plat: str) -> None:
@@ -279,7 +315,7 @@ def write_manifest(plat: str) -> None:
         "mopac": LOCK["mopac"]["version"],
         "vina": LOCK["vina"]["version"],
         "llama_cpp": LOCK["llama_cpp"]["tag"],
-        "model": {k: LOCK["model"][k] for k in ("name", "quantization", "file", "sha256", "license")},
+        "model": {k: model_spec(plat)[k] for k in ("name", "quantization", "file", "sha256", "license")},
     }
     target = ROOT / "engines" / plat / "manifest.json"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -302,7 +338,7 @@ def main() -> None:
     if "llama" in wanted:
         fetch_llama(plat, opts.jobs)
     if "model" in wanted:
-        fetch_model()
+        fetch_model(plat)
     if "fonts" in wanted:
         fetch_fonts()
     write_manifest(plat)
