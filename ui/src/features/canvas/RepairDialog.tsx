@@ -47,7 +47,8 @@ export function RepairDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           const map = report.atomMap ?? start.molecule.atoms.map((_a, i) => i);
           const next = applyCorrected(start, report.molecule, map);
           useEditor.getState().execute(t("history.repair"), next);
-          void validate({ atoms: [], bonds: [] }, false);
+          // The repaired geometry is the report's result: live physics must not re-relax it.
+          void validate({ atoms: [], bonds: [] }, false, { relax: false });
           window.dispatchEvent(new Event("mf:fit3d"));
         }
         setPhase({ kind: "done", report });

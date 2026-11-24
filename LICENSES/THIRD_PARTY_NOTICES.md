@@ -576,7 +576,7 @@ replaceable files: Meeko as plain Python source in the sidecar's `_internal/meek
 | mopac | 23.2.5 | Apache-2.0 | engines/mopac-23.2.5/LICENSE |
 | autodock-vina | 1.2.7 | Apache-2.0 | engines/autodock-vina-1.2.7/LICENSE |
 | llama.cpp | b12650 | MIT | engines/llama.cpp-b12650/LICENSE |
-| Qwen3-4B-Instruct-2507 | 2507 | Apache-2.0 | models/Qwen3-4B-Instruct-2507-2507/LICENSE |
+| Qwen3-4B-Instruct-2507 | Q4_K_M a06e946bb6b6 | Apache-2.0 | models/Qwen3-4B-Instruct-2507-Q4_K_M_a06e946bb6b6/LICENSE |
 | mopac/_openmp_mutex | 4.5 | BSD-3-Clause | engines/mopac/_openmp_mutex-4.5/LICENSE |
 | mopac/libblas | 3.11.0 | BSD-3-Clause | engines/mopac/libblas-3.11.0/LICENSE.txt |
 | mopac/libgcc | 16.2.0 | GPL-3.0-only WITH GCC-exception-3.1 AND LGPL-2.1-or-later (libquadmath) | common/GCC-exception-3.1.txt<br>common/GPL-3.0-only.txt<br>common/LGPL-2.1-or-later.txt |

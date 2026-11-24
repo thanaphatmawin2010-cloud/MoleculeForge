@@ -22,6 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DEST = ROOT / "app-shell" / "src-tauri" / "resources"
+README = "Staged by scripts/stage_resources.py; do not edit.\n"
 LOCK = json.loads((ROOT / "scripts" / "engines.lock.json").read_text(encoding="utf-8"))
 sys.path.insert(0, str(ROOT / "scripts"))
 from fetch_engines import model_spec, platform_key  # noqa: E402
@@ -58,9 +59,10 @@ def main() -> int:
     parser.add_argument("--without-model", action="store_true", help="omit the language model (test bundles only)")
     opts = parser.parse_args()
     plat = opts.platform or platform_key()
+    DEST.mkdir(parents=True, exist_ok=True)
     for child in DEST.glob("*"):
-        if child.name != "README.txt":
-            shutil.rmtree(child) if child.is_dir() and not child.is_symlink() else child.unlink()
+        shutil.rmtree(child) if child.is_dir() and not child.is_symlink() else child.unlink()
+    (DEST / "README.txt").write_text(README, encoding="utf-8")
     counts = {
         "compute": stage_tree(ROOT / "compute" / "dist" / "compute", DEST / "compute"),
         "engines": stage_tree(ROOT / "engines" / plat, DEST / "engines" / plat),

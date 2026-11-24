@@ -15,7 +15,7 @@ jobs:
         include:
           - os: ubuntu-22.04
             platform: linux-x64
-            bundles: deb,appimage
+            bundles: deb
           - os: windows-2022
             platform: windows-x64
             bundles: msi,nsis
@@ -61,8 +61,8 @@ jobs:
       - name: Installers
         shell: bash
         env:
-          # Optional code signing; builds are unsigned when these secrets are absent.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # Optional macOS signing and notarisation; builds are unsigned when these secrets are
+          # absent. Windows installers are signable afterwards with signtool (see BUILD_LOG.md).
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -70,6 +70,9 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: pnpm tauri build --bundles ${{ matrix.bundles }}
+      - name: AppImage (built without linuxdeploy scanning the self-contained payload)
+        if: runner.os == 'Linux'
+        run: compute/.venv/bin/python scripts/build_appimage.py
       - uses: actions/upload-artifact@v4
         with:
           name: moleculeforge-${{ matrix.platform }}

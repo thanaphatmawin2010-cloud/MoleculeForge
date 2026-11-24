@@ -29,7 +29,8 @@ export function PeriodicGrid({ elements, compact = false, selected = null, highl
   const { t, i18n } = useTranslation();
   return (
     <div
-      role="grid"
+      // A set of toggle buttons laid out as the periodic table (no grid keyboard model, so no ARIA grid).
+      role="group"
       // The periodic table's layout (group 1 on the left) is a scientific convention: never mirrored.
       dir="ltr"
       aria-label={t("periodic.gridLabel")}
@@ -45,9 +46,8 @@ export function PeriodicGrid({ elements, compact = false, selected = null, highl
         return (
           <motion.button
             key={el.Z}
-            role="gridcell"
             aria-label={`${t(`elements:element.${el.symbol}`)}, ${t("periodic.atomicNumber")} ${el.Z}`}
-            aria-selected={selected === el.Z}
+            aria-pressed={selected === el.Z}
             onClick={() => onSelect(el)}
             whileHover={{ y: -1, scale: compact ? 1.08 : 1.04 }}
             whileTap={{ scale: 0.97 }}
@@ -67,7 +67,7 @@ export function PeriodicGrid({ elements, compact = false, selected = null, highl
               <span className={cx("font-mono text-xs font-semibold", !heat && fam.ink)}>{el.symbol}</span>
             ) : (
               <>
-                <span className={cx("font-mono text-2xs leading-none opacity-80", !heat && fam.ink)}>{el.Z}</span>
+                <span className={cx("font-mono text-2xs leading-none", !heat && fam.ink)}>{el.Z}</span>
                 <span className={cx("mt-auto font-mono text-lg font-semibold leading-none", !heat && fam.ink)}>{el.symbol}</span>
                 <span className={cx("mt-0.5 truncate text-[10px] leading-tight opacity-85", !heat && fam.ink)}>
                   {heat && heatData ? (heatData.value === null ? "—" : formatNumber(heatData.value, i18n.language, 2)) : t(`elements:element.${el.symbol}`)}

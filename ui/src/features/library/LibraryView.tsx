@@ -159,15 +159,14 @@ export function LibraryView() {
         </header>
 
         <section aria-label={t("library.families")}>
-          <div className="grid grid-cols-5 gap-2" role="grid">
+          <div className="grid grid-cols-5 gap-2" role="group" aria-label={t("library.families")}>
             {grid.map((c) => {
               const fam = FAMILY_CLASS[LIBRARY_FAMILY[c.family] ?? "unknown"]!;
               const active = category === c.id;
               return (
                 <motion.button
                   key={c.id}
-                  role="gridcell"
-                  aria-selected={active}
+                  aria-pressed={active}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setCategory(active ? null : c.id)}
@@ -179,7 +178,7 @@ export function LibraryView() {
                     active ? "ring-2 ring-accent shadow-2" : "shadow-1 hover:shadow-2",
                   )}
                 >
-                  <span className={cx("font-mono text-2xs opacity-80", fam.ink)}>{String(c.row).padStart(1)}·{c.col}</span>
+                  <span className={cx("font-mono text-2xs", fam.ink)}>{String(c.row).padStart(1)}·{c.col}</span>
                   <span className={cx("text-sm font-semibold leading-tight", fam.ink)}>{t(`library.category.${c.id}`)}</span>
                   <span className={cx("font-mono text-xs", fam.ink)}>{t("library.count", { count: c.count })}</span>
                 </motion.button>

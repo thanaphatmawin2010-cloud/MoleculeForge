@@ -39,6 +39,20 @@ function cssColor(variable: string): THREE.Color {
   return color;
 }
 
+/** True when WebGL is served by a CPU rasteriser (SwiftShader, llvmpipe, softpipe). */
+function softwareRenderer(): boolean {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    if (!gl) return false;
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const name = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return /swiftshader|llvmpipe|softpipe|software/i.test(name);
+  } catch {
+    return false;
+  }
+}
+
 export function Viewer3D({
   molecule,
   selectedAtoms = [],
@@ -83,14 +97,17 @@ export function Viewer3D({
   useEffect(() => {
     const container = host.current!;
     let renderer: THREE.WebGLRenderer;
+    const software = softwareRenderer();
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+      // Multisampling is nearly free on a GPU but costs several times the frame time when WebGL
+      // falls back to a CPU rasteriser (no GPU driver, virtual machines).
+      renderer = new THREE.WebGLRenderer({ antialias: !software, alpha: false, powerPreference: "high-performance" });
     } catch {
       container.dataset.webgl = "unavailable";
       setWebglMissing(true);
       return;
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(software ? 1 : Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
     renderer.domElement.setAttribute("aria-hidden", "true");
@@ -245,17 +262,26 @@ export function Viewer3D({
       const next = new THREE.InstancedMesh(mesh.geometry, mesh.material, capacity);
       next.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       next.frustumCulled = false;
+      next.userData = { ...mesh.userData };
       state.scene.remove(mesh);
       state.scene.add(next);
       state[key] = next;
       return next;
     };
-    const lowDetail = atoms.length > 1500;
+    // Level of detail: typical molecules keep smooth spheres; large systems trade facets for
+    // frame rate (about 7× fewer triangles above 1,500 atoms). Bond ends are hidden inside the
+    // atom spheres, so the cheaper tiers drop the cylinder caps.
+    const tier = atoms.length > 1500 ? 2 : atoms.length > 300 ? 1 : 0;
     const atomMesh = grow(state.atoms, atoms.length, "atoms");
-    if (lowDetail !== Boolean(atomMesh.userData.lowDetail)) {
+    if (atomMesh.userData.tier !== tier) {
       atomMesh.geometry.dispose();
-      atomMesh.geometry = new THREE.SphereGeometry(1, lowDetail ? 12 : 32, lowDetail ? 8 : 20);
-      atomMesh.userData.lowDetail = lowDetail;
+      atomMesh.geometry = new THREE.SphereGeometry(1, [32, 16, 10][tier], [20, 12, 7][tier]);
+      atomMesh.userData.tier = tier;
+    }
+    if (state.bonds.userData.tier !== tier) {
+      state.bonds.geometry.dispose();
+      state.bonds.geometry = new THREE.CylinderGeometry(1, 1, 1, [18, 10, 6][tier], 1, tier > 0);
+      state.bonds.userData.tier = tier;
     }
     const radii = atoms.map((a) =>
       style === "spacefill" ? VDW[a.el] ?? 1.9 : style === "sticks" ? 0.16 : Math.max(0.17, Math.min(0.42, covalentRadius(a.el) * 0.42)),

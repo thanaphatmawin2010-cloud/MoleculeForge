@@ -8,11 +8,14 @@ import { defineConfig } from "@playwright/test";
  * (loopback WebSocket with a per-run token). The installed desktop app is exercised separately by
  * scripts/launch_check.py (cold start and the offline socket check over the whole process tree).
  */
-const token = `e2e-${Date.now().toString(36)}`;
+// The config is evaluated by the runner and again by every worker: the runner's token and data
+// directory reach the workers through the environment so the browser and the bridge agree.
+const token = process.env.MF_E2E_TOKEN ?? `e2e-${Date.now().toString(36)}`;
 // The browser preinstalled in the development container; CI sets PW_CHROMIUM="" to use Playwright's own.
 const chromium = process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium";
-const dataDir = mkdtempSync(join(tmpdir(), "moleculeforge-e2e-"));
+const dataDir = process.env.MF_E2E_DATA_DIR ?? mkdtempSync(join(tmpdir(), "moleculeforge-e2e-"));
 process.env.MF_E2E_TOKEN = token;
+process.env.MF_E2E_DATA_DIR = dataDir;
 
 export default defineConfig({
   testDir: "../tests/e2e",

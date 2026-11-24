@@ -95,12 +95,30 @@ for (const [theme, locale] of [["light", "en"], ["dark", "en"], ["light", "th"]]
   test(`every main view passes an accessibility scan (${theme}, ${locale})`, async ({ page }) => {
     await start(page, theme, locale);
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
-    for (const [shortcut, name] of [["Control+1", "build"], ["Control+2", "elements"], ["Control+3", "library"], ["Control+4", "simulate"]] as const) {
-      await page.keyboard.press(shortcut);
-      await page.waitForTimeout(800);
+    const scan = async (name: string) => {
       const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
       const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
       expect(serious.map((v) => `${name}: ${v.id} (${v.nodes.length})`)).toEqual([]);
+    };
+    for (const [shortcut, name] of [["Control+1", "build"], ["Control+2", "elements"], ["Control+3", "library"], ["Control+4", "simulate"]] as const) {
+      await page.keyboard.press(shortcut);
+      await page.waitForTimeout(800);
+      await scan(name);
     }
+    // Overlays: element detail, command palette, assistant.
+    await page.keyboard.press("Control+2");
+    await page.getByTestId("element-tile-Fe").click();
+    await page.waitForTimeout(800);
+    await scan("element detail");
+    await page.keyboard.press("Control+1");
+    await page.keyboard.press("Control+k");
+    await page.waitForTimeout(600);
+    await scan("command palette");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Control+j");
+    // Scan once the panel has finished sliding in (mid-animation opacity would distort contrast).
+    await expect(page.getByTestId("assistant-panel")).toHaveCSS("opacity", "1");
+    await page.waitForTimeout(300);
+    await scan("assistant");
   });
 }

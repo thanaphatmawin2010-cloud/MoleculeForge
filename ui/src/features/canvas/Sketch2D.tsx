@@ -439,6 +439,8 @@ export function Sketch2D({ className }: { className?: string }) {
                 data-testid={`atom-2d-${i}`}
                 data-element={atom.el}
               >
+                {/* Invisible footprint: an unlabelled carbon would otherwise have no geometry. */}
+                <circle cx={p[0]} cy={p[1]} r={0.3} fill="transparent" />
                 {(err || warn) && (
                   <circle cx={p[0]} cy={p[1]} r={0.46} className={cx(err ? "fill-danger/20 stroke-danger" : "fill-warning/15 stroke-warning", "animate-halo-pulse")} strokeWidth={0.04} style={{ transformOrigin: `${p[0]}px ${p[1]}px` }} />
                 )}

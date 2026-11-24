@@ -15,6 +15,16 @@ on your computer: nothing is uploaded, and no internet connection is needed.
 Every installer contains all the calculation engines, the element and molecule data, and the AI
 model, so nothing has to be downloaded after installation.
 
+On Windows, two things differ:
+
+* Windows installers cannot be larger than 2 GB, so they bundle a smaller model (Qwen3-1.7B). The
+  larger model used on macOS and Linux (Qwen3-4B-Instruct-2507) can be loaded from
+  **Assistant → Language model**.
+* PySCF, the density-functional (B3LYP) engine, is not available for Windows. Dipoles, orbitals
+  and charges come from GFN2-xTB there. Small hydrides such as water keep their MMFF94 geometry
+  after repair; its bond angles are within 1.5° of experiment for water, ammonia, hydrogen
+  sulfide and phosphine.
+
 ## Your first molecule (about one minute)
 
 The first time you open the app, a short guide builds water with you:
@@ -37,14 +47,16 @@ The first time you open the app, a short guide builds water with you:
 | Measure | **M**, then pick 2, 3 or 4 atoms to get a distance, angle or dihedral |
 | Select / move | **V**, then drag atoms or draw a selection box; **Delete** removes the selection |
 | Erase | **E**, then click an atom or bond |
-| Rings | Benzene, cyclohexane and cyclopentane buttons in the toolbar |
+| Rings | Benzene, cyclohexane and cyclopentane buttons in the toolbar: click to add one beside the drawing, or drag it onto the spot where you want it |
 | Undo / redo | **Ctrl Z** / **Ctrl Y** (⌘ on macOS); unlimited |
 | Add hydrogens | **Shift H** |
 | Clean up 2D layout | The wand button |
 | Fit to view | **F** |
 
 The inspector on the right shows the formula, molecular weight, counts, live validation, and
-switches for **Live physics**, **carbon labels** and **hydrogens on carbon**. Molecules opened from
+switches for **Live physics**, **carbon labels** and **hydrogens on carbon**. Live physics relaxes
+the 3D shape after each edit you make, for structures of up to 500 atoms; molecules you open and
+repaired structures keep their coordinates until you press **Relax now**. Molecules opened from
 files or the library are drawn as skeletal formulas, with hydrogens on carbon hidden; the switch
 shows them. Stereocentres from a file or the library appear as wedge and hash bonds.
 
@@ -119,6 +131,10 @@ tool call is shown with its result. It names the methods it relied on, marks its
 flags any number that did not come from a tool. It refuses requests that are unsafe or outside
 chemistry. On a typical laptop CPU an answer takes from several seconds to a few minutes; a GPU
 makes it faster.
+
+To use a different model, open the chip button in the assistant's header, choose
+**Choose a model file…** and pick any GGUF language model on your computer. Larger models answer
+better but need more memory. The choice is remembered; **Use the bundled model** switches back.
 
 ## Language and appearance
 

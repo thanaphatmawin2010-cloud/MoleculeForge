@@ -45,4 +45,27 @@ describe.each([
   it("keeps status colours readable on surfaces", () => {
     for (const key of ["accent", "danger", "success", "info"]) expect(contrast(t[key]!, t["surface-1"]!)).toBeGreaterThanOrEqual(3);
   });
+
+  it("keeps small status text readable on its soft background (badges, active navigation)", () => {
+    for (const key of ["accent", "success"]) expect(contrast(t[key]!, t[`${key}-soft`]!)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe.each([
+  ["light", /:root\s*\{/],
+  ["dark", /\[data-theme="dark"\]/],
+])("%s theme element-family tiles", (_name, selector) => {
+  const start = css.search(selector);
+  const body = css.slice(css.indexOf("{", start) + 1, css.indexOf("}", start));
+  const root = css.slice(css.indexOf("{", css.search(/:root\s*\{/)) + 1, css.indexOf("}", css.search(/:root\s*\{/)));
+  const pct = (name: string) => Number((body.match(new RegExp(`--${name}:\\s*([\\d.]+)%`)) ?? root.match(new RegExp(`--${name}:\\s*([\\d.]+)%`)))![1]);
+  const hues = [...root.matchAll(/--fam-([a-z]+):\s*([\d.]+);/g)].map((m) => [m[1]!, Number(m[2])] as const);
+
+  it("covers every family", () => expect(hues.length).toBe(11));
+
+  it.each(hues)("%s ink meets AA as small text on its tile", (_family, hue) => {
+    const tile: [number, number, number] = [hue, pct("tile-s"), pct("tile-l")];
+    const ink: [number, number, number] = [hue, pct("tile-ink-s"), pct("tile-ink-l")];
+    expect(contrast(ink, tile)).toBeGreaterThanOrEqual(4.5);
+  });
 });

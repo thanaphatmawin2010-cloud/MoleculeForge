@@ -32,7 +32,7 @@ export function loadMolecule(molecule: Molecule, layout: Vec2[] | null): void {
   useEditor.getState().load(doc);
   useValidation.getState().set({ hideCarbonH: hasExplicitCarbonH(molecule) });
   useApp.getState().setView("build");
-  void validate({ atoms: [], bonds: [] }, false);
+  void validate({ atoms: [], bonds: [] }, false, { relax: false });
   if (!layout) void relayout();
 }
 

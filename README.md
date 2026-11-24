@@ -16,7 +16,9 @@ your computer, with no network access at runtime, in English and Thai.
 
 Download the installer for your system: `.exe` or `.msi` for Windows, `.dmg` for macOS (arm64 or
 x64), `.AppImage` or `.deb` for Linux. Run it; there is nothing else to set up. Each installer
-already contains the calculation engines, the data and the language model.
+already contains the calculation engines, the data and the language model. Windows installers
+cannot exceed 2 GB, so they bundle a smaller model, and B3LYP (PySCF) is not available on Windows;
+the [user guide](docs/USER_GUIDE.md#installing) explains both.
 
 ## Build from source
 
@@ -58,6 +60,15 @@ compute/.venv/bin/python scripts/stage_resources.py
 
 ```bash
 pnpm tauri build
+```
+
+On Linux, build the `.deb` with `pnpm tauri build --bundles deb` and the AppImage with the script
+below. Tauri's own AppImage step runs linuxdeploy over the bundled engines, which fails on
+libraries that are only resolved at runtime. The script builds the AppImage without the payload,
+adds the payload, and packs it again.
+
+```bash
+compute/.venv/bin/python scripts/build_appimage.py
 ```
 
 `fetch_engines.py` downloads and verifies everything pinned in `scripts/engines.lock.json`: xtb,

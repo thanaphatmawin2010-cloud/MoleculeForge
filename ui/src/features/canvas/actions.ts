@@ -77,7 +77,15 @@ async function refreshWedges(): Promise<void> {
   }
 }
 
-export async function validate(focus: Focus, announce: boolean): Promise<void> {
+/** Live physics relaxes what the user draws; above this size it would cost seconds per edit, so
+ * large systems are relaxed only on request ("Relax now", Repair). */
+export const LIVE_PHYSICS_MAX_ATOMS = 500;
+
+/**
+ * Validate the document; `relax: false` skips the live-physics relaxation (a loaded file or
+ * library entry already has its own 3D coordinates).
+ */
+export async function validate(focus: Focus, announce: boolean, { relax = true }: { relax?: boolean } = {}): Promise<void> {
   const seq = ++validationSeq;
   const doc = useEditor.getState().doc;
   const store = useValidation.getState();
@@ -128,7 +136,9 @@ export async function validate(focus: Focus, announce: boolean): Promise<void> {
       hybridization,
       lastLatencyMs: Math.round(performance.now() - started),
     });
-    if (useValidation.getState().livePhysics && result.status !== "invalid") scheduleRelax();
+    if (relax && useValidation.getState().livePhysics && result.status !== "invalid" && current.molecule.atoms.length <= LIVE_PHYSICS_MAX_ATOMS) {
+      scheduleRelax();
+    }
   } catch (err) {
     if (seq !== validationSeq) return;
     useValidation.getState().set({ status: "invalid" });

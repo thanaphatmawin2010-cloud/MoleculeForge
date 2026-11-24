@@ -20,6 +20,11 @@ from ..rpc import CHEMISTRY_ERROR, RpcError
 
 KCAL_TO_KJ = 4.184
 RAD_TO_DEG = 57.29577951308232
+MDYNE_A_TO_KCAL = 143.9325
+# Halgren prints these as 0.043844 and 2.51210; RDKit (the reference implementation) uses the exact
+# products, and so do we, so energies agree to rounding error rather than to 1e-5 relative.
+ANGLE_K = MDYNE_A_TO_KCAL / RAD_TO_DEG**2
+STRETCH_BEND_K = MDYNE_A_TO_KCAL / RAD_TO_DEG
 LINEAR_TYPES = {4, 42, 53, 61}  # MMFFPROP "lin" flag: sp carbon, sp nitrogen, central =N=, isonitrile N
 CUTOFF_ATOMS = 2000  # above this, non-bonded interactions use a 1.2 nm cutoff with switching
 
@@ -53,7 +58,7 @@ def build_system(mol: Chem.Mol, variant: str = "MMFF94") -> tuple[openmm.System,
     system.addForce(bond_force)
 
     angle_force = openmm.CustomAngleForce(
-        f"{k}*0.043844*0.5*ka*dt^2*(1+cb*dt); dt=(theta-theta0)*{RAD_TO_DEG}; cb=-0.006981317"
+        f"{k}*{ANGLE_K!r}*0.5*ka*dt^2*(1+cb*dt); dt=(theta-theta0)*{RAD_TO_DEG}; cb=-0.006981317"
     )
     angle_force.addPerAngleParameter("ka")
     angle_force.addPerAngleParameter("theta0")
@@ -61,7 +66,7 @@ def build_system(mol: Chem.Mol, variant: str = "MMFF94") -> tuple[openmm.System,
     linear_force.addPerAngleParameter("ka")
     sb_force = openmm.CustomCompoundBondForce(
         3,
-        f"{k}*2.51210*(kijk*(10*distance(p1,p2)-r0ij)+kkji*(10*distance(p3,p2)-r0kj))*(angle(p1,p2,p3)-theta0)*{RAD_TO_DEG}",
+        f"{k}*{STRETCH_BEND_K!r}*(kijk*(10*distance(p1,p2)-r0ij)+kkji*(10*distance(p3,p2)-r0kj))*(angle(p1,p2,p3)-theta0)*{RAD_TO_DEG}",
     )
     for name in ("kijk", "kkji", "r0ij", "r0kj", "theta0"):
         sb_force.addPerBondParameter(name)
@@ -88,7 +93,7 @@ def build_system(mol: Chem.Mol, variant: str = "MMFF94") -> tuple[openmm.System,
         system.addForce(force)
 
     oop_force = openmm.CustomCompoundBondForce(
-        4, f"{k}*0.043844*0.5*koop*chi^2; chi=asin(min(1,max(-1,sin(angle(p4,p2,p3))*sin(dihedral(p4,p2,p3,p1)))))*{RAD_TO_DEG}"
+        4, f"{k}*{ANGLE_K!r}*0.5*koop*chi^2; chi=asin(min(1,max(-1,sin(angle(p4,p2,p3))*sin(dihedral(p4,p2,p3,p1)))))*{RAD_TO_DEG}"
     )
     oop_force.addPerBondParameter("koop")
     for atom in mol.GetAtoms():
