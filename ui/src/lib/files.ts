@@ -10,6 +10,12 @@ export interface FileFilter {
 
 const isTauri = () => typeof window !== "undefined" && Boolean(window.__TAURI_INTERNALS__);
 
+/** A file-name stem from a molecule name: letters (with their combining marks, e.g. Thai vowels),
+ * digits, "_" and "-" are kept; every other run of characters becomes "_". */
+export function fileStem(name: string): string {
+  return (name || "molecule").replace(/[^\p{L}\p{M}\p{N}_-]+/gu, "_");
+}
+
 export async function openTextFile(filters: FileFilter[]): Promise<{ name: string; text: string } | null> {
   if (isTauri()) {
     const { invoke } = await import("@tauri-apps/api/core");

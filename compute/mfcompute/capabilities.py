@@ -259,7 +259,7 @@ def detect(refresh: bool = False) -> dict[str, Any]:
             "engines": {
                 "libraries": libs,
                 "xtb": _engine_version("xtb", "xtb", ["--version"], r"xtb version ([\d.]+)"),
-                "mopac": _engine_version("mopac", "mopac", ["--version"], r"MOPAC\s*v?([\w.]+)"),
+                "mopac": _engine_version("mopac", "mopac", ["--version"], r"MOPAC\s+(?:version\s+)?v?(\d[\w.]*)"),
                 "vina": _engine_version("vina", "vina", ["--version"], r"Vina v([\d.]+)"),
                 "llama": {"available": paths.executable("llama", "llama-server") is not None, "devices": llm_devices},
                 "model": model_info(),

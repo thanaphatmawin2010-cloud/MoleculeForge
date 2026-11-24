@@ -19,8 +19,8 @@ runs the chemistry and simulation work.
      pydantic-validated methods · job pool with progress + cancellation
      ├─ RDKit (in process): parsing, sanitisation, validation, descriptors, MMFF94/UFF, ETKDG
      ├─ OpenMM (in process): MMFF94 as custom forces, Langevin dynamics, CPU/OpenCL/CUDA
-     ├─ PySCF (spawned worker process): B3LYP single points, finite-field polarisability,
-     │     B3LYP geometry optimisation (PyBerny) for one-heavy-atom hydrides
+     ├─ PySCF (spawned worker process; not on Windows): B3LYP single points, finite-field
+     │     polarisability, B3LYP geometry optimisation (PyBerny) for one-heavy-atom hydrides
      ├─ xtb 6.8 (subprocess): GFN2-xTB / GFN-FF optimisation, Hessians, charges
      ├─ MOPAC 23 (subprocess): PM7 heats of formation
      ├─ AutoDock Vina 1.2.7 (subprocess) + Meeko: docking
@@ -56,11 +56,13 @@ runs the chemistry and simulation work.
 ## Chemistry pipelines
 
 * **Live validation (§7.3).** Each structural edit is committed as an undoable command and checked
-  by `chem.validateBonds` (2–3 ms warm). Reason codes in `mfcompute/chem/issues.py` carry 1-based
+  by `chem.validateBonds` (2–5 ms for drug-sized molecules, round trip included). Reason codes in `mfcompute/chem/issues.py` carry 1-based
   atom numbers. The UI localises each code through `ui/src/locales/*/issues.json`. Fixes are
   applied as a separate undoable command and announced with "Bond connection fixed successfully.".
-  Valid bonds are confirmed with "Bond connected correctly.". With live physics on, coordinates are
-  relaxed with MMFF94 and the frames stream back into the 3D view. A deterministic 0.02 Å nudge
+  Valid bonds are confirmed with "Bond connected correctly.". With live physics on, the user's own
+  edits are relaxed with MMFF94 (UFF where MMFF has no parameters) and the frames stream back into
+  the 3D view; structures over 500 atoms, opened files, library entries and repaired structures
+  keep their coordinates until the user asks for a relaxation. A deterministic 0.02 Å nudge
   breaks the symmetry of exactly linear or planar sketches, so they are never left on a saddle point.
 * **One-click repair (§7.4, `mfcompute/chem/geometry.py`).** The stages are: detect, fix chemistry,
   perceive hybridisation and VSEPR, add hydrogens, choose a start geometry (keep a usable one,
@@ -75,10 +77,12 @@ runs the chemistry and simulation work.
   RDKit descriptors, GFN2-xTB optimisation, the Hessian with RRHO and quasi-RRHO thermochemistry,
   PM7 heats of formation, B3LYP dipoles, orbitals and polarisabilities, SASA and shape, and an
   optional 10 ps MD run. Each level has size limits. Every value has the form
-  `{value, unit, method, uncertainty?}`. Results are cached by InChIKey and method. A result in which
+  `{value, unit, method, uncertainty?}`. Warnings come as English text (for exports and the
+  assistant) and as codes with parameters that the UI translates. Results are cached by InChIKey
+  and method. A result in which
   an engine *failed* is never cached, so the next run tries the engine again.
-* **Dynamics and docking.** MD uses OpenMM with MMFF94 expressed as custom forces (energy parity
-  with RDKit better than 1e-4 kcal/mol), or MoleculeForge's own BAOAB integrator on UFF forces.
+* **Dynamics and docking.** MD uses OpenMM with MMFF94 expressed as custom forces (energies
+  identical to RDKit's to machine precision, `tests/unit/compute/test_openmm_mmff.py`), or MoleculeForge's own BAOAB integrator on UFF forces.
   Docking runs Vina on Meeko-typed inputs with a blind search box covering the receptor.
 * **Stereochemistry.** Each structure records where its stereo came from (`meta.stereo`): a 3D source,
   fully specified SMILES or InChI, partially specified, none, or unknown. Wedge and hash bonds are
@@ -98,7 +102,8 @@ runs the chemistry and simulation work.
   (`mfcompute/data/library.py`). Prebuilt rows are re-synchronised whenever the bundled file's
   content hash changes, and favourites are kept.
 * `data/knowledge/`: curated reference passages that the assistant retrieves with BM25.
-* `data/models/`: the GGUF language model (Qwen3-4B-Instruct-2507, Q4_K_M), checked against its sha256.
+* `data/models/`: the GGUF language model, checked against its sha256: Qwen3-4B-Instruct-2507
+  (Q4_K_M) on macOS and Linux, Qwen3-1.7B (Q4_K_M) on Windows, whose installers cannot exceed 2 GB.
 
 ## Local assistant (§7.10)
 
@@ -106,16 +111,21 @@ runs the chemistry and simulation work.
 server runs in offline mode with no web UI. The assistant runs a tool loop over eight
 strictly-schematised tools (sanitize, validateBonds, repairGeometry, descriptors, simulate, dock,
 getElement, lookupMolecule) that call the real engines. Before an answer is shown, every number in it
-must match a tool result, the user's message or the retrieved references. Otherwise the model
-revises once, and any numbers still unsupported are flagged and confidence drops to low. Requests
-outside chemistry or that are unsafe are refused. Tool calls stream to the UI as they happen.
+must match a tool result, the user's message or the retrieved references. Otherwise the draft is
+discarded and the next turn must call at least one tool (`tool_choice: required`) before answering
+again; numbers still unsupported after that are flagged and confidence drops to low. Requests
+outside chemistry or that are unsafe are refused. Tool calls stream to the UI as they happen. Any
+GGUF model can be chosen in the assistant (`ai.configure`); the choice is remembered in the user's
+data folder.
 
 ## User interface
 
 * `src/design-system/`: tokens (CSS variables for light and dark, contrast-tested), primitives
   (Radix), overlays and the `Quantity`/`Formula` renderers.
 * `src/features/`: `canvas` (sketcher, 3D viewer, actions, repair dialog), `periodic`, `library`,
-  `simulate` and `assistant`.
+  `simulate` and `assistant`. The 3D viewer draws atoms and bonds as two instanced meshes with three
+  levels of detail (≤ 300, ≤ 1,500 and more atoms) and turns off multisampling when WebGL runs on a
+  CPU rasteriser.
 * `src/state/`: zustand stores. The editor store holds documents with unlimited undo and redo.
 * `src/locales/`: ICU message files. `ui/scripts/check-i18n.mjs` fails CI on any missing key,
   placeholder mismatch, untranslated value family or hard-coded JSX text.
@@ -132,8 +142,9 @@ outside chemistry or that are unsafe are refused. Tool calls stream to the UI as
    keep their layout; LGPL components remain replaceable files.
 4. `scripts/collect_licenses.py`: licence texts for every bundled component, written to `LICENSES/`.
 5. `scripts/stage_resources.py`: stages the installer payload, using hard links.
-6. `tauri build`: builds the installers (`.deb` and AppImage on Linux, `.msi` and NSIS `.exe` on
-   Windows, `.dmg` on macOS; see `.github/workflows/release.yml`).
+6. `tauri build`: builds the installers (`.deb` on Linux, `.msi` and NSIS `.exe` on Windows, `.dmg`
+   on macOS; see `.github/workflows/release.yml`). The Linux AppImage comes from
+   `scripts/build_appimage.py`, because Tauri's AppImage step cannot scan the engine payload.
 
 ## Repository layout
 

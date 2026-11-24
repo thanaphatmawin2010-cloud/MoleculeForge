@@ -132,8 +132,8 @@ flags any number that did not come from a tool. It refuses requests that are uns
 chemistry. On a typical laptop CPU an answer takes from several seconds to a few minutes; a GPU
 makes it faster.
 
-To use a different model, open the chip button in the assistant's header, choose
-**Choose a model file…** and pick any GGUF language model on your computer. Larger models answer
+To use a different model, open **Language model** (the chip button in the assistant's header),
+choose **Choose a model file…** and pick any GGUF language model on your computer. Larger models answer
 better but need more memory. The choice is remembered; **Use the bundled model** switches back.
 
 ## Language and appearance

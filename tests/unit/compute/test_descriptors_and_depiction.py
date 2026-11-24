@@ -118,3 +118,12 @@ def test_report_exports_markdown_and_pdf() -> None:
     pdf = report.export(data, "pdf", "th", {"title": "รายงานการซ่อมแซม"})
     raw = base64.b64decode(pdf["data"])
     assert raw.startswith(b"%PDF") and pdf["bytes"] == len(raw)
+
+
+def test_report_file_name_keeps_non_latin_names() -> None:
+    """A Thai molecule name keeps its vowel marks in the report's file name."""
+    from mfcompute.chem.report import _slug
+
+    assert _slug("กรดแอซีติก") == "กรดแอซีติก"
+    assert _slug("Acetic acid / glacial") == "acetic-acid-glacial"
+    assert _slug("") == "molecule"

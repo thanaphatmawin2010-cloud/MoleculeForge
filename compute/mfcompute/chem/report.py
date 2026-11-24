@@ -16,6 +16,7 @@ import base64
 import io
 import re
 import time
+import unicodedata
 from collections.abc import Iterable
 from html import escape
 from typing import Any
@@ -101,7 +102,9 @@ def _atoms_label(change: dict[str, Any]) -> str:
 
 
 def _slug(name: str) -> str:
-    slug = re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-").lower()
+    """File-name stem: letters with their combining marks (Thai vowels), and digits; other runs -> "-"."""
+    kept = "".join(ch if unicodedata.category(ch)[0] in "LMN" else "-" for ch in name)
+    slug = re.sub(r"-+", "-", kept).strip("-").lower()
     return slug[:60] or "molecule"
 
 

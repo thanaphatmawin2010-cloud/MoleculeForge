@@ -23,7 +23,9 @@ def _codes(m: Molecule) -> set[str]:
 
 
 def test_every_code_has_english_and_thai_text() -> None:
-    for lang in ("en", "th"):
+    languages = sorted(p.name for p in (ROOT / "ui" / "src" / "locales").iterdir() if (p / "issues.json").exists())
+    assert {"en", "th"} <= set(languages)
+    for lang in languages:
         locale = json.loads((ROOT / "ui" / "src" / "locales" / lang / "issues.json").read_text(encoding="utf-8"))
         assert set(issues.CODES) <= set(locale["code"]), lang
         assert set(issues.FIX_DESCRIPTIONS) <= set(locale["fix"]), lang
@@ -65,6 +67,8 @@ def test_auto_fix_reports_bond_connection_fixed_successfully() -> None:
     assert result["status"] == "fixed"
     assert result["message"] == "Bond connection fixed successfully."
     fix = result["fixes"][0]
+    assert {"before", "reason", "fix", "after"} <= set(fix), "§7.3: every fix logs {before, reason, fix, after}"
+    assert fix["before"] != fix["after"]
     assert fix["fix"]["params"], "fixes carry display parameters for localisation"
     assert fix["reason"] == "VALENCE_EXCEEDED" and fix["reasonParams"]["atom"] == 1
 
@@ -76,7 +80,9 @@ def test_every_simulation_warning_is_localised_with_the_same_parameters() -> Non
     from mfcompute.sim import notes
 
     placeholder = re.compile(r"{(\w+)}")
-    for lang in ("en", "th"):
+    languages = sorted(p.name for p in (ROOT / "ui" / "src" / "locales").iterdir() if (p / "common.json").exists())
+    assert {"en", "th"} <= set(languages)
+    for lang in languages:
         locale = json.loads((ROOT / "ui" / "src" / "locales" / lang / "common.json").read_text(encoding="utf-8"))["simWarning"]
         assert set(notes.TEXT) == set(locale), lang
         for code, english in notes.TEXT.items():

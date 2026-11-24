@@ -3,7 +3,10 @@ import {
   addAtom,
   addBond,
   addBondedAtom,
+  angle,
   BOND_2D,
+  dihedral,
+  distance,
   emptyDoc,
   forgetStereo,
   formulaOf,
@@ -100,5 +103,21 @@ describe("molecule graph operations", () => {
     const known = { ...doc, molecule: { ...doc.molecule, meta: { ...doc.molecule.meta, stereo: "defined" as const } } };
     expect(stereoKnown(known.molecule)).toBe(true);
     expect(stereoKnown(forgetStereo(known).molecule)).toBe(false);
+  });
+
+  it("measures distances, angles and signed dihedrals (§7.2 measure tool)", () => {
+    const at = (coords: [number, number, number][]) => ({
+      ...emptyDoc().molecule,
+      atoms: coords.map(([x, y, z], i) => ({ i, el: "C", x, y, z, charge: 0, isotope: null, hCount: null })),
+    });
+    expect(distance(at([[0, 0, 0], [3, 4, 0]]), 0, 1)).toBeCloseTo(5, 10);
+    const half = (104.5 * Math.PI) / 360;
+    const water = at([[Math.sin(half), Math.cos(half), 0], [0, 0, 0], [-Math.sin(half), Math.cos(half), 0]]);
+    expect(angle(water, 0, 1, 2)).toBeCloseTo(104.5, 8);
+    for (const theta of [60, -60, 180, 0]) {
+      const r = (theta * Math.PI) / 180;
+      const chain = at([[1, 0, 0], [0, 0, 0], [0, 0, 1.5], [Math.cos(r), Math.sin(r), 1.5]]);
+      expect(Math.abs(dihedral(chain, 0, 1, 2, 3) - theta) % 360).toBeCloseTo(0, 8);
+    }
   });
 });

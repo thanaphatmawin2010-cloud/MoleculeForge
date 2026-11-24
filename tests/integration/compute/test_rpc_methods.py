@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -14,6 +15,8 @@ def test_capabilities_report_hardware(sidecar: Any) -> None:
     assert "gpu" in caps
     for engine in ("xtb", "mopac", "vina", "llama", "model"):
         assert caps["engines"][engine]["available"] is True, engine
+    for engine in ("xtb", "mopac", "vina"):  # versions are shown in the app; they must be real ones
+        assert re.fullmatch(r"\d+(\.\d+)+", caps["engines"][engine]["version"]), caps["engines"][engine]
 
 
 def test_sanitize_and_validate(sidecar: Any) -> None:

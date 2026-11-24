@@ -34,7 +34,9 @@ English (`en`) is the reference. A language is shipped only when it is complete.
    It fails if any key is missing or extra, if a message is not valid ICU, if placeholders differ
    from English, or if any value produced by the data or the compute engine (element symbols,
    categories, crystal structures, uses, notes, reason codes, fixes, library families, pKa
-   groups, property names, job stages, report labels) has no translation.
+   groups, property names, job stages, simulation warnings, report labels) has no translation.
+   The compute tests (`tests/unit/compute/test_issue_codes.py`) check every locale folder for the
+   engine's reason codes and warning codes.
 5. Run the unit tests (`pnpm --dir ui test`), then switch to the new language in the app and walk
    through every view. Long words can wrap differently; check the toolbar and the inspector.
 

@@ -3,7 +3,7 @@ import i18next from "i18next";
 import { api } from "@/ipc/api";
 import { RpcError } from "@/ipc/client";
 import type { Molecule } from "@/ipc/schema";
-import { formatFromName, MOLECULE_FILTERS, openTextFile, saveFile } from "@/lib/files";
+import { MOLECULE_FILTERS, fileStem, formatFromName, openTextFile, saveFile } from "@/lib/files";
 import { applyCorrected, type Doc, emptyDoc, insertFragment, layoutFrom3D, newId, normalizeLayout, stereoKnown, toRdkitLayout, type Vec2 } from "@/lib/molecule";
 import { useApp } from "@/state/app";
 import { useEditor } from "@/state/editor";
@@ -88,7 +88,7 @@ export async function exportMolecule(format: "sdf" | "mol" | "smiles" | "inchi" 
   try {
     const { data } = await api.convert({ source: "molecule", target: format, molecule });
     const ext = format === "smiles" ? "smi" : format;
-    const name = `${(molecule.name || "molecule").replace(/[^\p{L}\p{N}_-]+/gu, "_")}.${ext}`;
+    const name = `${fileStem(molecule.name)}.${ext}`;
     if (await saveFile(name, data ?? "", [{ name: format.toUpperCase(), extensions: [ext] }])) {
       toast({ tone: "success", title: i18next.t("io.exported", { name }) });
     }

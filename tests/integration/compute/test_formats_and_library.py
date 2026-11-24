@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -67,3 +68,33 @@ def test_library_categories_cover_the_prebuilt_set(sidecar: Any) -> None:
     categories = sidecar.call("library.categories", {})["categories"]
     assert sum(c["count"] for c in categories) >= 100
     assert all(c["row"] and c["col"] for c in categories)
+
+
+def test_library_persists_across_restarts(tmp_path: Path) -> None:
+    """§7.7: a saved molecule is still there after the engine (and so the app) restarts."""
+    from conftest import Sidecar
+
+    first = Sidecar(tmp_path)
+    try:
+        molecule = first.molecule("CCOC(=O)C", "persisted ester")
+        saved = first.call("library.save", {"molecule": molecule, "layout2d": None})
+        if not saved["saved"]:
+            saved = first.call("library.save", {"molecule": molecule, "layout2d": None, "overwrite": True})
+    finally:
+        first.close()
+    second = Sidecar(tmp_path)
+    try:
+        assert second.call("library.load", {"id": saved["id"]})["name"] == "persisted ester"
+    finally:
+        second.close()
+
+
+def test_property_results_are_cached_by_inchikey_and_method(sidecar: Any) -> None:
+    """§7.8: an identical second run is served from the cache, and says so."""
+    molecule = sidecar.molecule("CC(C)O", "isopropanol")
+    first = sidecar.call("sim.properties", {"molecule": molecule, "level": "fast"}, timeout=600)
+    second = sidecar.call("sim.properties", {"molecule": molecule, "level": "fast"}, timeout=600)
+    assert "cached" not in [w["code"] for w in first["warningCodes"]]
+    assert "cached" in [w["code"] for w in second["warningCodes"]]
+    assert second["properties"]["molecularWeight"] == first["properties"]["molecularWeight"]
+

@@ -15,6 +15,7 @@ import { useApp } from "@/state/app";
 import { useEditor } from "@/state/editor";
 import { Viewer3D } from "../canvas/Viewer3D";
 import { IrSpectrum, LineChart, OrbitalLevels } from "./charts";
+import { exportFileName, resultToCsv, resultToJson } from "./export";
 
 type Job = "properties" | "minimize" | "md" | "dock";
 
@@ -141,16 +142,8 @@ export function SimulateView() {
 
   const exportResult = async (format: "json" | "csv") => {
     if (!result) return;
-    let data: string;
-    if (format === "json") data = JSON.stringify(result, null, 2);
-    else {
-      const rows = [["property", "value", "unit", "method", "uncertainty"]];
-      for (const [key, pv] of Object.entries(result.properties)) {
-        rows.push([key, typeof pv.value === "object" ? JSON.stringify(pv.value) : String(pv.value), pv.unit, pv.method, pv.uncertainty != null ? String(pv.uncertainty) : ""]);
-      }
-      data = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
-    }
-    const name = `${(molecule.name || "molecule").replace(/[^\p{L}\p{N}_-]+/gu, "_")}-${result.method.replace(/\W+/g, "-")}.${format}`;
+    const data = format === "json" ? resultToJson(result) : resultToCsv(result);
+    const name = exportFileName(molecule.name, result.method, format);
     if (await saveFile(name, data, [{ name: format.toUpperCase(), extensions: [format] }])) pushToast({ tone: "success", title: t("simulate.exported", { name }) });
   };
 

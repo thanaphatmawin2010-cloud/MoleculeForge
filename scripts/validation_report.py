@@ -86,6 +86,16 @@ def run_once() -> dict[str, Any]:
             client.close()
 
 
+def geometry_method(repair: dict[str, Any]) -> str:
+    """Name the geometry that was actually reported. A structure already at the refined minimum
+    (within the idempotency thresholds) keeps its input coordinates, which come from SMILES
+    conversion (ETKDGv3 + MMFF94s); otherwise the refinement method produced them."""
+    refined = repair["residualEnergy"]["method"].replace(" total energy", "")
+    if repair["status"] == "already-optimal":
+        return f"MMFF94s input geometry; {refined}: already optimal"
+    return f"{refined} geometry"
+
+
 def fmt(v: float | None, d: int = 3) -> str:
     return "—" if v is None else f"{v:.{d}f}"
 
@@ -108,11 +118,11 @@ def main() -> int:
             vals = bonds.get(key, [])
             worst = max(vals, key=lambda v: abs(v - ref)) if vals else float("nan")
             label = f"{key[0]}–{key[1]} ({key[2]})"
-            rows.append(f"| | Bond {label} | {ref:.3f} Å | {worst:.4f} Å | ±{BOND_TOL} Å | {r['repair']['residualEnergy']['method'].replace(' total energy', '')} geometry | {check(bool(vals) and abs(worst - ref) <= BOND_TOL)} |")
+            rows.append(f"| | Bond {label} | {ref:.3f} Å | {worst:.4f} Å | ±{BOND_TOL} Å | {geometry_method(r['repair'])} | {check(bool(vals) and abs(worst - ref) <= BOND_TOL)} |")
         for key, ref in angle_ref.items():
             vals = angles.get((min(key[0], key[2]), key[1], max(key[0], key[2])), [])
             worst = max(vals, key=lambda v: abs(v - ref)) if vals else float("nan")
-            rows.append(f"| | Angle {key[0]}–{key[1]}–{key[2]} | {ref:.2f}° | {worst:.2f}° | ±{ANGLE_TOL}° | {r['repair']['residualEnergy']['method'].replace(' total energy', '')} geometry | {check(bool(vals) and abs(worst - ref) <= ANGLE_TOL)} |")
+            rows.append(f"| | Angle {key[0]}–{key[1]}–{key[2]} | {ref:.2f}° | {worst:.2f}° | ±{ANGLE_TOL}° | {geometry_method(r['repair'])} | {check(bool(vals) and abs(worst - ref) <= ANGLE_TOL)} |")
         dip = r["props"].get("dipoleMoment")
         if dip_ref is not None and dip:
             ok = dip["value"] < 0.05 if dip_ref == 0 else abs(dip["value"] - dip_ref) <= DIPOLE_TOL
@@ -165,16 +175,20 @@ def main() -> int:
         "* **Geometry.** Repair embeds with RDKit ETKDGv3 (seed 0x5EED) when needed, minimises with MMFF94, then refines:",
         "  hydrides of a single heavy atom (H₂O, NH₃, CH₄) with B3LYP/def2-SVP (PySCF, PyBerny optimiser), larger",
         "  molecules with GFN2-xTB (xtb 6.8.0, tight convergence). A structure already within 0.005 Å RMSD or",
-        "  0.05 kcal/mol of the refined minimum is reported as already optimal and returned unchanged.",
+        "  0.05 kcal/mol of the refined minimum is reported as already optimal and returned unchanged; SMILES input",
+        "  arrives with an ETKDGv3 + MMFF94s geometry, and the table says where that geometry was kept.",
         "* **Dipole moments.** B3LYP/def2-SVPD single point (PySCF) at the GFN2-xTB geometry of the property battery.",
         "* **Molecular weight, H-bond donors/acceptors, logP, Lipinski.** RDKit (IUPAC standard atomic weights,",
         "  Lipinski definitions, Wildman–Crippen logP).",
         "",
         "## Environment",
         "",
-        f"* MoleculeForge compute {caps.get('version', '1.0.0')} on {platform.system()} {platform.machine()},"
+        f"* MoleculeForge compute {caps['app']['computeVersion']} on {platform.system()} {platform.machine()},"
         f" {caps['cpu'].get('physicalCores')} physical cores; engines: "
-        + ", ".join(f"{k} {v.get('version', '')}".strip() for k, v in caps["engines"].items() if isinstance(v, dict) and v.get("available")),
+        + ", ".join(f"{label} {caps['engines'][key]['version']}" for key, label in (("xtb", "xtb"), ("mopac", "MOPAC"), ("vina", "AutoDock Vina"))
+                    if caps["engines"].get(key, {}).get("available"))
+        + f"; PySCF {caps['engines']['libraries'].get('pyscf', 'unavailable')}; OpenMM {caps['engines']['libraries'].get('openmm')}; "
+        + f"RDKit {caps['engines']['libraries'].get('rdkit')}",
         "* Wall time per molecule (repair + standard properties): "
         + ", ".join(f"{name} {first[name]['seconds']:.1f} s" for name, *_ in REFERENCE),
         "",

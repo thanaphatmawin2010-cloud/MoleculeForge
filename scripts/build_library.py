@@ -137,7 +137,7 @@ def main() -> int:
                     raise ValueError(f"clash {clashes} Å")
             mol_id = slug(name)
             meta = molecule.meta.model_copy(update={"category": spec["category"], "source": "prebuilt",
-                                                    "created": catalog["version"]})
+                                                    "created": catalog["released"]})
             molecule = molecule.model_copy(update={"id": mol_id, "name": name, "meta": meta})
             rd = convert.to_rdkit(molecule)
             layout = layout_2d(rd)

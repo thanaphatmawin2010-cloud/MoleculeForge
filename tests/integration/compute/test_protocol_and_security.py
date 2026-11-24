@@ -77,3 +77,36 @@ def test_model_choice_is_validated_applied_and_reset(sidecar: Any, tmp_path: Pat
     assert sidecar.call("ai.status", {})["model"]["name"] == "tiny-model"
     status = sidecar.call("ai.configure", {"useDefault": True})
     assert status["model"]["bundled"] is True and status["model"]["name"] == status["bundledModel"]
+
+
+def test_cancelling_a_repair_stops_its_engine_process(sidecar: Any) -> None:
+    """§7.4: repair runs with progress and can be cancelled; its DFT worker process is terminated."""
+    from conftest import RpcFailure
+
+    def dft_workers() -> list[psutil.Process]:
+        # The spawned PySCF worker; Python's long-lived multiprocessing resource tracker is not one.
+        out = []
+        for child in psutil.Process(sidecar.proc.pid).children(recursive=True):
+            try:
+                if "spawn_main" in " ".join(child.cmdline()) and child.status() != psutil.STATUS_ZOMBIE:
+                    out.append(child)
+            except psutil.NoSuchProcess:
+                continue
+        return out
+
+    water = sidecar.molecule("O", "water")
+    bent = {**water, "atoms": [{**a, "x": a["x"] * 1.25, "y": a["y"] * 0.7} for a in water["atoms"]]}
+    req = sidecar.send("chem.repairGeometry", {"molecule": bent}, job_id="cancel-repair")
+    deadline = time.time() + 60
+    while not dft_workers() and time.time() < deadline:
+        time.sleep(0.05)
+    assert dft_workers(), "the B3LYP refinement started in its worker process"
+    assert sidecar.progress_for("cancel-repair"), "progress was reported"
+    assert sidecar.call("job.cancel", {"jobId": "cancel-repair"})["cancelled"] is True
+    with pytest.raises(RpcFailure) as cancelled:
+        sidecar.wait(req, timeout=60)
+    assert cancelled.value.error["code"] == -32000
+    deadline = time.time() + 10
+    while dft_workers() and time.time() < deadline:
+        time.sleep(0.1)
+    assert not dft_workers(), "the worker was terminated"

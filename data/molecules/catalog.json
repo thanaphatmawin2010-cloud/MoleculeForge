@@ -1,5 +1,6 @@
 {
   "version": "2026.11.1",
+  "released": "2026-11-01T00:00:00+00:00",
   "$comment": "Curated prebuilt molecules. scripts/build_library.py embeds, optimises (GFN2-xTB), validates (zero corrections) and writes library.json + library.sdf. 'cip' asserts stereocentre labels; 'inchikey' asserts identity.",
   "molecules": [
     {

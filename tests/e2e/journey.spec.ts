@@ -91,6 +91,31 @@ test("a ring template dragged onto the sketch is inserted where it is dropped", 
   await expect(page.getByTestId("formula")).not.toHaveText("C6H6");
 });
 
+test("periodic table: all elements, search, detail with units, heat map and trends", async ({ page }) => {
+  await start(page);
+  await page.keyboard.press("Control+2");
+  await expect(page.locator('[data-testid^="element-tile-"]')).toHaveCount(118);
+  // Search by name dims every other element.
+  await page.getByTestId("periodic-search").fill("iron");
+  await expect(page.getByTestId("element-tile-Fe")).not.toHaveClass(/opacity-25/);
+  await expect(page.getByTestId("element-tile-Cu")).toHaveClass(/opacity-25/);
+  await page.getByTestId("periodic-search").fill("");
+  // Detail panel: name, unit-labelled values, configuration, isotopes and trends.
+  await page.getByTestId("element-tile-Fe").click();
+  const detail = page.getByTestId("element-detail");
+  await expect(detail.getByRole("heading", { name: "Iron" })).toBeVisible();
+  await expect(detail).toContainText("55.845");
+  await expect(detail).toContainText("Electron configuration");
+  await expect(detail).toContainText(/Isotopes \(\d+\)/);
+  await expect(detail).toContainText("Trends");
+  await expect(detail).toContainText("across period 4");
+  // Heat map by property colours every tile with data.
+  await page.getByRole("radio", { name: "Property" }).click();
+  await expect(page.getByTestId("heat-property")).toBeVisible();
+  const styled = await page.locator('[data-testid^="element-tile-"]').evaluateAll((tiles) => tiles.filter((t) => (t as HTMLElement).style.backgroundColor !== "").length);
+  expect(styled).toBeGreaterThan(80);
+});
+
 for (const [theme, locale] of [["light", "en"], ["dark", "en"], ["light", "th"]] as const) {
   test(`every main view passes an accessibility scan (${theme}, ${locale})`, async ({ page }) => {
     await start(page, theme, locale);
