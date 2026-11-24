@@ -42,7 +42,7 @@ export default defineConfig(({ mode }) => ({
     server: { deps: { inline: ["i18next-icu", "intl-messageformat"] } },
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "../tests/unit/ui/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "../tests/unit/ui/**/*.test.{ts,tsx}", "../tests/unit/lite/**/*.test.ts"],
     css: false,
   },
 }) as never);
