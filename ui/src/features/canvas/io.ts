@@ -1,8 +1,8 @@
 /** Document-level commands shared by the Build view, the library and the command palette. */
 import i18next from "i18next";
 import { api } from "@/ipc/api";
-import { RpcError } from "@/ipc/client";
 import type { Molecule } from "@/ipc/schema";
+import { errorText } from "@/lib/errors";
 import { MOLECULE_FILTERS, fileStem, formatFromName, openTextFile, saveFile } from "@/lib/files";
 import { applyCorrected, type Doc, emptyDoc, insertFragment, layoutFrom3D, newId, normalizeLayout, stereoKnown, toRdkitLayout, type Vec2 } from "@/lib/molecule";
 import { useApp } from "@/state/app";
@@ -55,7 +55,7 @@ export async function addHydrogens(): Promise<void> {
     const next = applyCorrected(doc, molecule, doc.molecule.atoms.map((_a, i) => i));
     commit(i18next.t("history.addHydrogens"), next, { atoms: [], bonds: [] });
   } catch (err) {
-    toast({ tone: "danger", title: i18next.t("canvas.addHydrogensFailed"), body: err instanceof RpcError ? err.message : String(err) });
+    toast({ tone: "danger", title: i18next.t("canvas.addHydrogensFailed"), body: errorText(err) });
   }
 }
 
@@ -78,7 +78,7 @@ export async function openMoleculeFile(): Promise<void> {
       body: molecules!.length > 1 ? i18next.t("io.openedFirstOf", { count: molecules!.length }) : undefined,
     });
   } catch (err) {
-    toast({ tone: "danger", title: i18next.t("io.openFailed"), body: err instanceof RpcError ? err.message : String(err) });
+    toast({ tone: "danger", title: i18next.t("io.openFailed"), body: errorText(err) });
   }
 }
 
@@ -93,7 +93,7 @@ export async function exportMolecule(format: "sdf" | "mol" | "smiles" | "inchi" 
       toast({ tone: "success", title: i18next.t("io.exported", { name }) });
     }
   } catch (err) {
-    toast({ tone: "danger", title: i18next.t("io.exportFailed"), body: err instanceof RpcError ? err.message : String(err) });
+    toast({ tone: "danger", title: i18next.t("io.exportFailed"), body: errorText(err) });
   }
 }
 
@@ -121,7 +121,7 @@ export async function saveToLibrary(overwrite = false): Promise<void> {
       body: i18next.t("library.savedInto", { category: i18next.t(`library.category.${result.category ?? "other"}`) }),
     });
   } catch (err) {
-    toast({ tone: "danger", title: i18next.t("library.saveFailed"), body: err instanceof RpcError ? err.message : String(err) });
+    toast({ tone: "danger", title: i18next.t("library.saveFailed"), body: errorText(err) });
   }
 }
 

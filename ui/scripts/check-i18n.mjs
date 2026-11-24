@@ -107,8 +107,9 @@ for (const file of sources) {
     used++;
     if (!has(ns, key)) fail(`${rel}: unknown i18n key ${ns}:${key}`);
   }
-  // Keys stored in constants (e.g. suggestion lists), skipping RPC method names in src/ipc
-  if (!rel.includes(join("src", "ipc"))) {
+  // Keys stored in constants (e.g. suggestion lists), skipping RPC method names in src/ipc and in
+  // MoleculeForge Lite's in-browser engine (src/lite), which answers the same methods.
+  if (!rel.includes(join("src", "ipc")) && !rel.includes(join("src", "lite"))) {
     for (const m of text.matchAll(/["']((?:elements:|issues:)?[a-z]+(?:\.[A-Za-z0-9-]+)+)["']/g)) {
       const [ns, key] = splitKey(m[1]);
       const head = key.split(".")[0];

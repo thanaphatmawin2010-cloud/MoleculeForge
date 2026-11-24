@@ -9,9 +9,12 @@ import { useTranslation } from "react-i18next";
 import { Badge, Button, IconButton, cx } from "@/design-system/primitives";
 import { type AiAnswer, type AiStatus, api, askAssistant } from "@/ipc/api";
 import { rpc, RpcError } from "@/ipc/client";
+import { IS_LITE } from "@/lib/edition";
+import { errorText } from "@/lib/errors";
 import { canChooseModel, chooseModelFile } from "@/lib/files";
 import { useApp } from "@/state/app";
 import { useEditor } from "@/state/editor";
+import { DesktopOnly } from "../../app/LiteNotice";
 
 interface ToolChip {
   id: string;
@@ -55,7 +58,7 @@ export function AssistantPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open || status || statusFailed) return;
+    if (!open || status || statusFailed || IS_LITE) return;
     api.aiStatus().then(setStatus).catch(() => setStatusFailed(true));
   }, [open, status, statusFailed]);
 
@@ -66,7 +69,7 @@ export function AssistantPanel() {
       setStatus(next);
       pushToast({ tone: "success", title: t("assistant.model.changed", { model: next.model.name ?? "" }) });
     } catch (err) {
-      pushToast({ tone: "danger", title: t("assistant.model.failed"), body: err instanceof Error ? err.message : String(err) });
+      pushToast({ tone: "danger", title: t("assistant.model.failed"), body: errorText(err) });
     }
   };
   const chooseModel = async () => {
@@ -74,7 +77,7 @@ export function AssistantPanel() {
       const picked = await chooseModelFile();
       if (picked) await applyModel({ modelPath: picked.path });
     } catch (err) {
-      pushToast({ tone: "danger", title: t("assistant.model.failed"), body: err instanceof Error ? err.message : String(err) });
+      pushToast({ tone: "danger", title: t("assistant.model.failed"), body: errorText(err) });
     }
   };
 
@@ -136,7 +139,7 @@ export function AssistantPanel() {
         return next;
       });
     } catch (err) {
-      const message = err instanceof RpcError && err.cancelled ? t("assistant.cancelled") : err instanceof Error ? err.message : String(err);
+      const message = err instanceof RpcError && err.cancelled ? t("assistant.cancelled") : errorText(err);
       setTurns((prev) => {
         const next = [...prev];
         const last = next[next.length - 1]!;
@@ -169,7 +172,9 @@ export function AssistantPanel() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-ink">{t("assistant.title")}</p>
               <p className="truncate text-2xs text-ink-3" data-testid="assistant-model">
-                {status?.available
+                {IS_LITE
+                  ? t("lite.feature.assistant.title")
+                  : status?.available
                   ? t("assistant.runningOn", { model: status.model.name ?? "", device: status.accelerator })
                   : status || statusFailed
                     ? t("assistant.unavailable")
@@ -207,110 +212,119 @@ export function AssistantPanel() {
             </IconButton>
           </header>
 
-          <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" aria-live="polite">
-            {turns.length === 0 && (
-              <div className="space-y-3">
-                <p className="text-sm leading-6 text-ink-2">{t("assistant.intro")}</p>
-                <div className="flex flex-col gap-2">
-                  {SUGGESTIONS.map((key) => (
-                    <button
-                      key={key}
-                      className="rounded bg-surface-2 px-3 py-2 text-start text-xs text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink hairline"
-                      onClick={() => void send(t(key))}
-                    >
-                      {t(key)}
-                    </button>
-                  ))}
+          {IS_LITE ? (
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <p className="mb-3 text-sm leading-6 text-ink-2">{t("assistant.intro")}</p>
+              <DesktopOnly feature="assistant" />
+            </div>
+          ) : (
+            <>
+            <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" aria-live="polite">
+              {turns.length === 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm leading-6 text-ink-2">{t("assistant.intro")}</p>
+                  <div className="flex flex-col gap-2">
+                    {SUGGESTIONS.map((key) => (
+                      <button
+                        key={key}
+                        className="rounded bg-surface-2 px-3 py-2 text-start text-xs text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink hairline"
+                        onClick={() => void send(t(key))}
+                      >
+                        {t(key)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {turns.map((turn, i) =>
-              turn.role === "user" ? (
-                <div key={i} className="ms-10 rounded-lg bg-accent-soft px-3 py-2 text-sm text-ink" data-testid="assistant-user-turn">
-                  {turn.content}
-                </div>
-              ) : (
-                <div key={i} className="space-y-2" data-testid="assistant-answer" data-confidence={turn.meta?.confidence}>
-                  {turn.tools && turn.tools.length > 0 && (
-                    <ul className="space-y-1">
-                      {turn.tools.map((tool) => (
-                        <li key={tool.id} className="flex items-center gap-2 rounded bg-surface-2 px-2.5 py-1.5 text-2xs hairline" data-testid="assistant-tool-call" data-tool={tool.name}>
-                          {tool.status === "running" ? (
-                            <Loader2 className="size-3 animate-spin text-accent" />
-                          ) : tool.status === "done" ? (
-                            <Check className="size-3 text-success" />
-                          ) : (
-                            <TriangleAlert className="size-3 text-danger" />
-                          )}
-                          <Wrench className="size-3 text-ink-3" />
-                          <span className="font-mono font-medium text-ink">{tool.name}</span>
-                          <span className="truncate text-ink-3">{tool.summary}</span>
-                          {tool.durationMs !== undefined && <span className="ms-auto font-mono text-ink-3">{tool.durationMs} ms</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {turn.content ? (
-                    <Markdown text={turn.content} />
-                  ) : (
-                    turn.pending && (
-                      <p className="flex items-center gap-2 text-xs text-ink-3">
-                        <Loader2 className="size-3.5 animate-spin" />
-                        {t(`assistant.stage.${stage ?? "thinking"}`)}
-                      </p>
-                    )
-                  )}
-                  {turn.meta && !turn.pending && (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge tone={turn.meta.confidence === "high" ? "success" : turn.meta.confidence === "medium" ? "info" : "warning"}>
-                        {t(`assistant.confidence.${turn.meta.confidence}`)}
-                      </Badge>
-                      {turn.meta.unsupported && turn.meta.unsupported.length > 0 && (
-                        <Badge tone="warning">{t("assistant.unsupported", { values: turn.meta.unsupported.join(", ") })}</Badge>
-                      )}
-                      {turn.meta.durationMs > 0 && <span className="text-2xs text-ink-3">{(turn.meta.durationMs / 1000).toFixed(1)} s</span>}
-                    </div>
-                  )}
-                </div>
-              ),
-            )}
-          </div>
-
-          <form
-            className="border-t border-line p-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void send(input);
-            }}
-          >
-            <div className="flex items-end gap-2 rounded-lg bg-surface-2 p-2 hairline focus-within:ring-2 focus-within:ring-focus">
-              <textarea
-                className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent px-1 text-sm text-ink placeholder:text-ink-3 focus:outline-none"
-                rows={2}
-                value={input}
-                placeholder={t("assistant.placeholder")}
-                aria-label={t("assistant.placeholder")}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send(input);
-                  }
-                }}
-                data-testid="assistant-input"
-              />
-              {busy ? (
-                <Button type="button" size="sm" variant="secondary" icon={<Square className="size-3.5" />} onClick={() => jobRef.current && void rpc().cancel(jobRef.current)}>
-                  {t("action.stop")}
-                </Button>
-              ) : (
-                <Button type="submit" size="sm" variant="primary" icon={<Send className="size-3.5" />} disabled={!input.trim() || status?.available === false || statusFailed} data-testid="assistant-send">
-                  {t("assistant.send")}
-                </Button>
+              )}
+              {turns.map((turn, i) =>
+                turn.role === "user" ? (
+                  <div key={i} className="ms-10 rounded-lg bg-accent-soft px-3 py-2 text-sm text-ink" data-testid="assistant-user-turn">
+                    {turn.content}
+                  </div>
+                ) : (
+                  <div key={i} className="space-y-2" data-testid="assistant-answer" data-confidence={turn.meta?.confidence}>
+                    {turn.tools && turn.tools.length > 0 && (
+                      <ul className="space-y-1">
+                        {turn.tools.map((tool) => (
+                          <li key={tool.id} className="flex items-center gap-2 rounded bg-surface-2 px-2.5 py-1.5 text-2xs hairline" data-testid="assistant-tool-call" data-tool={tool.name}>
+                            {tool.status === "running" ? (
+                              <Loader2 className="size-3 animate-spin text-accent" />
+                            ) : tool.status === "done" ? (
+                              <Check className="size-3 text-success" />
+                            ) : (
+                              <TriangleAlert className="size-3 text-danger" />
+                            )}
+                            <Wrench className="size-3 text-ink-3" />
+                            <span className="font-mono font-medium text-ink">{tool.name}</span>
+                            <span className="truncate text-ink-3">{tool.summary}</span>
+                            {tool.durationMs !== undefined && <span className="ms-auto font-mono text-ink-3">{tool.durationMs} ms</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {turn.content ? (
+                      <Markdown text={turn.content} />
+                    ) : (
+                      turn.pending && (
+                        <p className="flex items-center gap-2 text-xs text-ink-3">
+                          <Loader2 className="size-3.5 animate-spin" />
+                          {t(`assistant.stage.${stage ?? "thinking"}`)}
+                        </p>
+                      )
+                    )}
+                    {turn.meta && !turn.pending && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge tone={turn.meta.confidence === "high" ? "success" : turn.meta.confidence === "medium" ? "info" : "warning"}>
+                          {t(`assistant.confidence.${turn.meta.confidence}`)}
+                        </Badge>
+                        {turn.meta.unsupported && turn.meta.unsupported.length > 0 && (
+                          <Badge tone="warning">{t("assistant.unsupported", { values: turn.meta.unsupported.join(", ") })}</Badge>
+                        )}
+                        {turn.meta.durationMs > 0 && <span className="text-2xs text-ink-3">{(turn.meta.durationMs / 1000).toFixed(1)} s</span>}
+                      </div>
+                    )}
+                  </div>
+                ),
               )}
             </div>
-            <p className={cx("mt-2 text-2xs text-ink-3")}>{t("assistant.disclaimer")}</p>
-          </form>
+
+            <form
+              className="border-t border-line p-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void send(input);
+              }}
+            >
+              <div className="flex items-end gap-2 rounded-lg bg-surface-2 p-2 hairline focus-within:ring-2 focus-within:ring-focus">
+                <textarea
+                  className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent px-1 text-sm text-ink placeholder:text-ink-3 focus:outline-none"
+                  rows={2}
+                  value={input}
+                  placeholder={t("assistant.placeholder")}
+                  aria-label={t("assistant.placeholder")}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send(input);
+                    }
+                  }}
+                  data-testid="assistant-input"
+                />
+                {busy ? (
+                  <Button type="button" size="sm" variant="secondary" icon={<Square className="size-3.5" />} onClick={() => jobRef.current && void rpc().cancel(jobRef.current)}>
+                    {t("action.stop")}
+                  </Button>
+                ) : (
+                  <Button type="submit" size="sm" variant="primary" icon={<Send className="size-3.5" />} disabled={!input.trim() || status?.available === false || statusFailed} data-testid="assistant-send">
+                    {t("assistant.send")}
+                  </Button>
+                )}
+              </div>
+              <p className={cx("mt-2 text-2xs text-ink-3")}>{t("assistant.disclaimer")}</p>
+            </form>
+            </>
+          )}
         </motion.aside>
       )}
     </AnimatePresence>

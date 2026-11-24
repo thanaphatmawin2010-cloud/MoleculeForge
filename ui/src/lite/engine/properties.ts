@@ -215,13 +215,13 @@ export async function minimizeJob(params: { molecule: Molecule; method?: string;
   const started = performance.now();
   const method = params.method ?? "auto";
   if (["GFN2-xTB", "GFN-FF", "UFF"].includes(method)) {
-    throw new RpcFailure(ENGINE_UNAVAILABLE, `${method} runs in the MoleculeForge desktop app`, { engine: method === "UFF" ? "uff" : "xtb", code: "DESKTOP_ONLY" });
+    throw new RpcFailure(ENGINE_UNAVAILABLE, `${method} runs in the MoleculeForge desktop app`, { engine: method === "UFF" ? "uff" : "xtb", feature: "quantum", code: "DESKTOP_ONLY" });
   }
   const molecule = prepare(params.molecule);
   const perception = withMol(toRDKitStrict(molecule), (mol) => perceive(mol));
   const explicit = withExplicitHydrogens(molecule, perception);
   const ff = chooseForceField(explicit, method === "auto" ? "auto" : method);
-  if (!ff) throw new RpcFailure(ENGINE_UNAVAILABLE, "MMFF94 has no parameters for every atom in this structure; the desktop app adds UFF and GFN2-xTB", { engine: "mmff", code: "DESKTOP_ONLY" });
+  if (!ff) throw new RpcFailure(ENGINE_UNAVAILABLE, "MMFF94 has no parameters for every atom in this structure; the desktop app adds UFF and GFN2-xTB", { engine: "mmff", feature: "mmff", code: "DESKTOP_ONLY" });
   const maxSteps = params.maxSteps ?? 2000;
   const result = await runMinimize(explicit, explicit.atoms.map((a) => a.pos), ff, ctx, { maxSteps, stream: params.streamFrames ?? true, stage: "minimize" });
   const notes = new Notes();

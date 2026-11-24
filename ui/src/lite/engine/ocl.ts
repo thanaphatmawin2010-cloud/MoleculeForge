@@ -10,16 +10,13 @@ type OclMolecule = InstanceType<typeof OCL.Molecule>;
 
 let resourcesReady: Promise<void> | null = null;
 
-/** Register OpenChemLib's force-field and torsion tables (a URL in the browser, the package in Node). */
+/** Register OpenChemLib's force-field and torsion tables: in Node from the package, in the browser
+ * from resources.json next to the bundled library (the build emits it), or from ``resourcesUrl``. */
 export function loadOCL(resourcesUrl?: string): Promise<void> {
   resourcesReady ??= (async () => {
-    if (resourcesUrl) {
-      const response = await fetch(resourcesUrl);
-      if (!response.ok) throw new Error(`could not load OpenChemLib resources (${response.status})`);
-      OCL.Resources.register(await response.text());
-    } else {
-      OCL.Resources.registerFromNodejs();
-    }
+    const node = Boolean((globalThis as { process?: { versions?: { node?: string } } }).process?.versions?.node);
+    if (node && !resourcesUrl) OCL.Resources.registerFromNodejs();
+    else await OCL.Resources.registerFromUrl(resourcesUrl);
   })();
   return resourcesReady;
 }

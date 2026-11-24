@@ -259,6 +259,54 @@
     "title": "Molecule library",
     "unfavorite": "Remove from favourites"
   },
+  "lite": {
+    "banner": {
+      "body": "Draw, check, repair and analyse molecules here; nothing leaves your device. Molecular dynamics, docking, quantum chemistry and the AI assistant come with the desktop app.",
+      "dismiss": "Hide this message",
+      "title": "MoleculeForge Lite · free trial"
+    },
+    "download": "Get the desktop app",
+    "error": {
+      "assistant": "The AI assistant runs in the MoleculeForge desktop app.",
+      "dock": "Docking runs in the MoleculeForge desktop app.",
+      "formats": "Opening {format} files needs the MoleculeForge desktop app. The trial opens SDF, MOL and SMILES.",
+      "generic": "This needs the MoleculeForge desktop app.",
+      "md": "Molecular dynamics runs in the MoleculeForge desktop app.",
+      "mmff": "MMFF94 has no parameters for some atoms in this structure. The desktop app handles it with UFF or GFN2-xTB.",
+      "pdf": "PDF reports are written by the desktop app. Export Markdown here.",
+      "quantum": "This method runs in the MoleculeForge desktop app. Use MMFF94 here."
+    },
+    "failed": "The compute engine could not start in this browser",
+    "feature": {
+      "assistant": {
+        "body": "It runs a language model (Qwen3) on your own computer and answers with values from the real chemistry tools. Nothing is sent online.",
+        "title": "The AI assistant is in the desktop app"
+      },
+      "dock": {
+        "body": "The desktop app docks ligands into receptors from your library with AutoDock Vina and ranks the poses.",
+        "title": "Docking is in the desktop app"
+      },
+      "formats": {
+        "body": "The trial opens SDF, MOL and SMILES files. The desktop app also opens InChI, XYZ and PDB.",
+        "title": "More file formats in the desktop app"
+      },
+      "md": {
+        "body": "The desktop app runs OpenMM dynamics on your GPU, with temperature and energy traces and averaged properties.",
+        "title": "Molecular dynamics is in the desktop app"
+      },
+      "pdf": {
+        "body": "Here you can export the repair report as Markdown.",
+        "title": "PDF reports are in the desktop app"
+      },
+      "quantum": {
+        "body": "Here you get RDKit descriptors, an MMFF94 geometry and shape. The desktop app adds GFN2-xTB, PM7 and DFT energies, orbitals, IR spectra and thermochemistry.",
+        "title": "Quantum chemistry is in the desktop app"
+      }
+    },
+    "hardware": "Runs on this device with WebAssembly · {cores} CPU threads",
+    "methodDesktop": "{method} (desktop app)",
+    "offline": "Molecules and results stay on this device."
+  },
   "measure": {
     "angle": "Angle",
     "dihedral": "Dihedral",
@@ -557,6 +605,7 @@
     "dockingEstimate": "Educational/research estimate: rigid receptor, empirical scoring (typical error ≈ 2–3 kcal/mol), no explicit solvent.",
     "hessianSizeLimit": "Vibrational analysis skipped: {atoms, plural, one {# atom exceeds} other {# atoms exceed}} the {level, select, fast {Fast} standard {Standard} thorough {Thorough} other {{level}}} limit of {limit, number}.",
     "imaginaryFrequencies": "Imaginary frequencies found: the structure is not a true minimum at the GFN2-xTB level.",
+    "liteEngines": "MoleculeForge Lite computes descriptors, an MMFF94 geometry and shape on this device; GFN2-xTB, PM7, DFT, vibrations and molecular dynamics run in the desktop app.",
     "mdGasPhase": "Gas-phase single-molecule dynamics; averages are canonical-ensemble estimates with block-averaged uncertainties.",
     "minimizeStepLimit": "Stopped after {steps, plural, one {# step} other {# steps}} before reaching the gradient tolerance.",
     "pm7Failed": "PM7 heat of formation unavailable: {reason}",
@@ -633,6 +682,8 @@
     "cpu": "CPU",
     "error": "Compute engine error",
     "gpu": "GPU",
+    "liteReady": "Ready · runs on this device",
+    "liteStarting": "Loading the compute engine… {percent}%",
     "ready": "Ready · {device} · {cores} cores",
     "starting": "Starting the compute engine…"
   },

@@ -24,8 +24,8 @@ type Handler = (params: Record<string, unknown>, ctx: JobContext) => unknown;
 const MAX_ATOMS = 20_000;
 const MAX_LINE_BYTES = 64 * 1024 * 1024;
 
-function desktopOnly(what: string, engine: string): never {
-  throw new RpcFailure(ENGINE_UNAVAILABLE, `${what} runs in the MoleculeForge desktop app`, { engine, code: "DESKTOP_ONLY" });
+function desktopOnly(what: string, engine: string, feature: string): never {
+  throw new RpcFailure(ENGINE_UNAVAILABLE, `${what} runs in the MoleculeForge desktop app`, { engine, feature, code: "DESKTOP_ONLY" });
 }
 
 function molecule(value: unknown, key = "molecule"): Molecule {
@@ -112,8 +112,8 @@ export class LiteServer {
 
     this.on("sim.minimize", "job", (p, ctx) => minimizeJob({ molecule: molecule(p["molecule"]), method: str(p["method"], "auto"), maxSteps: Number(p["maxSteps"] ?? 2000), streamFrames: p["streamFrames"] !== false }, ctx));
     this.on("sim.properties", "job", (p, ctx) => properties({ molecule: molecule(p["molecule"]), level: str(p["level"], "standard"), md: p["md"] === true }, ctx));
-    this.on("sim.md", "job", () => desktopOnly("Molecular dynamics", "openmm"));
-    this.on("sim.dock", "job", () => desktopOnly("Docking", "vina"));
+    this.on("sim.md", "job", () => desktopOnly("Molecular dynamics", "openmm", "md"));
+    this.on("sim.dock", "job", () => desktopOnly("Docking", "vina", "dock"));
 
     this.on("elements.get", "interactive", (p) => elements.get(p["z"] as number | undefined, p["symbol"] as string | undefined));
     this.on("elements.all", "interactive", () => {
@@ -139,8 +139,8 @@ export class LiteServer {
       available: false, running: false, model: { path: null, name: null, sizeBytes: null, bundled: false }, bundledModel: null,
       contextSize: 0, accelerator: "none", offloadLayers: 0, edition: "lite",
     }));
-    this.on("ai.query", "job", () => desktopOnly("The AI assistant", "llama"));
-    this.on("ai.configure", "interactive", () => desktopOnly("The AI assistant", "llama"));
+    this.on("ai.query", "job", () => desktopOnly("The AI assistant", "llama", "assistant"));
+    this.on("ai.configure", "interactive", () => desktopOnly("The AI assistant", "llama", "assistant"));
   }
 
   ready(): void {

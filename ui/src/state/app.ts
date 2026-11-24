@@ -21,6 +21,8 @@ interface AppState {
   theme: Theme;
   sidecar: "starting" | "ready" | "error";
   sidecarError: string | null;
+  /** Lite only: how far the in-browser engine has loaded (0-100) while it starts. */
+  engineProgress: number | null;
   capabilities: Capabilities | null;
   elements: Element[];
   assistantOpen: boolean;
@@ -30,6 +32,7 @@ interface AppState {
   setView: (view: View) => void;
   setTheme: (theme: Theme) => void;
   setSidecar: (state: AppState["sidecar"], error?: string) => void;
+  setEngineProgress: (percent: number | null) => void;
   setCapabilities: (caps: Capabilities) => void;
   setElements: (elements: Element[]) => void;
   toggleAssistant: (open?: boolean) => void;
@@ -50,6 +53,7 @@ export const useApp = create<AppState>((set) => ({
   theme: initialTheme(),
   sidecar: "starting",
   sidecarError: null,
+  engineProgress: null,
   capabilities: null,
   elements: [],
   assistantOpen: false,
@@ -63,6 +67,7 @@ export const useApp = create<AppState>((set) => ({
     set({ theme });
   },
   setSidecar: (sidecar, error) => set({ sidecar, sidecarError: error ?? null }),
+  setEngineProgress: (engineProgress) => set({ engineProgress }),
   setCapabilities: (capabilities) => set({ capabilities }),
   setElements: (elements) => set({ elements }),
   toggleAssistant: (open) => set((s) => ({ assistantOpen: open ?? !s.assistantOpen })),

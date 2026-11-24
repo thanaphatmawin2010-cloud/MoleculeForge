@@ -9,15 +9,22 @@ import { Quantity } from "@/design-system/quantity";
 import { api, type LibraryItem } from "@/ipc/api";
 import { RpcError } from "@/ipc/client";
 import type { Molecule, PropertyValue, SimulationResult } from "@/ipc/schema";
+import { IS_LITE } from "@/lib/edition";
+import { errorText } from "@/lib/errors";
 import { saveFile } from "@/lib/files";
 import { withCoordinates, formulaOf } from "@/lib/molecule";
 import { useApp } from "@/state/app";
 import { useEditor } from "@/state/editor";
+import { DesktopOnly } from "../../app/LiteNotice";
 import { Viewer3D } from "../canvas/Viewer3D";
 import { IrSpectrum, LineChart, OrbitalLevels } from "./charts";
 import { exportFileName, resultToCsv, resultToJson } from "./export";
 
 type Job = "properties" | "minimize" | "md" | "dock";
+
+const METHODS = ["auto", "MMFF94", "MMFF94s", "UFF", "GFN-FF", "GFN2-xTB"];
+/** MoleculeForge Lite minimises with OpenChemLib's MMFF94/MMFF94s; the rest need the desktop engines. */
+const LITE_METHODS = new Set(["auto", "MMFF94", "MMFF94s"]);
 
 const GROUPS: { id: string; icon: ReactNode; keys: string[] }[] = [
   { id: "identity", icon: <Atom className="size-4" />, keys: ["formula", "molecularWeight", "exactMass", "atomCount", "heavyAtomCount", "netCharge", "stereocenters", "rotationalSymmetryNumber"] },
@@ -121,7 +128,7 @@ export function SimulateView() {
     };
     try {
       let res: SimulationResult;
-      if (job === "properties") res = await api.properties(molecule, level, withMd, { signal: ctl.signal, onProgress });
+      if (job === "properties") res = await api.properties(molecule, IS_LITE ? "fast" : level, IS_LITE ? false : withMd, { signal: ctl.signal, onProgress });
       else if (job === "minimize") res = await api.minimize(molecule, method, { signal: ctl.signal, onProgress });
       else if (job === "md") res = await api.md(molecule, { temperatureK: temperature, steps, reportEvery: Math.max(10, Math.round(steps / 200)) }, { signal: ctl.signal, onProgress });
       else {
@@ -131,7 +138,7 @@ export function SimulateView() {
       setResult(res);
     } catch (err) {
       if (!(err instanceof RpcError && err.cancelled)) {
-        pushToast({ tone: "danger", title: t("simulate.failed"), body: err instanceof Error ? err.message : String(err) });
+        pushToast({ tone: "danger", title: t("simulate.failed"), body: errorText(err) });
       }
     } finally {
       setPreview(null);
@@ -172,6 +179,7 @@ export function SimulateView() {
   const xtbCharges = props.partialChargesXtb?.value as number[] | undefined;
   const dftCharges = props.partialChargesMulliken?.value as number[] | undefined;
   const pka = props.pKaEstimates?.value as { group: string; groupId?: string; kind: string; pKa: number; uncertainty?: number; atoms: number[] }[] | undefined;
+  const desktopOnlyJob = IS_LITE && (job === "md" || job === "dock");
 
   return (
     <div className="flex h-full min-h-0">
@@ -193,7 +201,8 @@ export function SimulateView() {
             { value: "dock", label: t("simulate.jobDock") },
           ]}
         />
-        {job === "properties" && (
+        {job === "properties" && IS_LITE && <DesktopOnly feature="quantum" />}
+        {job === "properties" && !IS_LITE && (
           <div className="space-y-3">
             <Field label={t("simulate.level")} htmlFor="level" hint={t(`simulate.levelHint.${level}`)}>
               <Segmented label={t("simulate.level")} value={level} onChange={setLevel} options={[
@@ -208,13 +217,16 @@ export function SimulateView() {
         {job === "minimize" && (
           <Field label={t("simulate.method")} htmlFor="method">
             <select id="method" className={inputClass} value={method} onChange={(e) => setMethod(e.target.value)}>
-              {["auto", "MMFF94", "MMFF94s", "UFF", "GFN-FF", "GFN2-xTB"].map((m) => (
-                <option key={m} value={m}>{m === "auto" ? t("simulate.auto") : m}</option>
+              {METHODS.map((m) => (
+                <option key={m} value={m} disabled={IS_LITE && !LITE_METHODS.has(m)}>
+                  {m === "auto" ? t("simulate.auto") : IS_LITE && !LITE_METHODS.has(m) ? t("lite.methodDesktop", { method: m }) : m}
+                </option>
               ))}
             </select>
           </Field>
         )}
-        {job === "md" && (
+        {desktopOnlyJob && <DesktopOnly feature={job === "md" ? "md" : "dock"} />}
+        {job === "md" && !IS_LITE && (
           <div className="space-y-3">
             <Field label={t("simulate.temperature")} htmlFor="md-t" hint="K">
               <input id="md-t" type="number" min={10} max={2000} className={inputClass} value={temperature} onChange={(e) => setTemperature(Number(e.target.value))} />
@@ -224,7 +236,7 @@ export function SimulateView() {
             </Field>
           </div>
         )}
-        {job === "dock" && (
+        {job === "dock" && !IS_LITE && (
           <Field label={t("simulate.receptor")} htmlFor="receptor" hint={t("simulate.receptorHint")}>
             <select id="receptor" className={inputClass} value={receptorId} onChange={(e) => setReceptorId(e.target.value)}>
               <option value="">{t("simulate.chooseReceptor")}</option>
@@ -246,16 +258,22 @@ export function SimulateView() {
               {t("action.cancel")}
             </Button>
           </div>
-        ) : (
+        ) : desktopOnlyJob ? null : (
           <Button variant="primary" size="lg" icon={<Play className="size-4" />} onClick={() => void run()} disabled={job === "dock" && !receptorId} data-testid="run-simulation">
             {t("simulate.run")}
           </Button>
         )}
         <div className="mt-auto space-y-1 rounded bg-surface-2/70 p-3 text-2xs text-ink-3 hairline">
           <p className="flex items-center gap-1.5 font-medium text-ink-2"><Cpu className="size-3.5" />{t("simulate.hardware")}</p>
-          <p>{capabilities ? t("simulate.cpu", { cores: capabilities.cpu.physicalCores ?? "?", threads: capabilities.selected.threads }) : "…"}</p>
-          <p>{capabilities ? t("simulate.gpu", { platform: capabilities.selected.openmmPlatform ?? "CPU", llm: capabilities.selected.llmOffload.toUpperCase() }) : ""}</p>
-          <p>{t("simulate.offline")}</p>
+          {IS_LITE ? (
+            <p>{t("lite.hardware", { cores: capabilities?.cpu.logicalCores ?? "?" })}</p>
+          ) : (
+            <>
+              <p>{capabilities ? t("simulate.cpu", { cores: capabilities.cpu.physicalCores ?? "?", threads: capabilities.selected.threads }) : "…"}</p>
+              <p>{capabilities ? t("simulate.gpu", { platform: capabilities.selected.openmmPlatform ?? "CPU", llm: capabilities.selected.llmOffload.toUpperCase() }) : ""}</p>
+            </>
+          )}
+          <p>{IS_LITE ? t("lite.offline") : t("simulate.offline")}</p>
         </div>
       </aside>
 
@@ -385,6 +403,8 @@ export function SimulateView() {
                             </table>
                           </div>
                         </section>
+                      ) : IS_LITE ? (
+                        <DesktopOnly feature="quantum" />
                       ) : (
                         <p className="text-sm text-ink-3">{t("results.noSpectra")}</p>
                       )}
@@ -427,6 +447,8 @@ export function SimulateView() {
                             { name: "Ekin", tone: "success", points: md.timePs.map((x, i) => [x, md.kinetic[i]!]) },
                           ]} />
                         </div>
+                      ) : IS_LITE ? (
+                        <DesktopOnly feature="md" />
                       ) : (
                         <p className="text-sm text-ink-3">{t("results.noDynamics")}</p>
                       )}
@@ -453,6 +475,8 @@ export function SimulateView() {
                             ))}
                           </tbody>
                         </table>
+                      ) : IS_LITE ? (
+                        <DesktopOnly feature="dock" />
                       ) : (
                         <p className="text-sm text-ink-3">{t("results.noDocking")}</p>
                       )}

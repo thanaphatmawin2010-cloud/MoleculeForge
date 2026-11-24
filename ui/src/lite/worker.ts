@@ -3,7 +3,7 @@
  * MoleculeForge Lite's compute engine, run in a Web Worker so the UI thread never blocks. It speaks
  * the desktop sidecar's newline-free JSON-RPC lines over postMessage and loads everything from the
  * app's own origin (no third-party servers): RDKit's WebAssembly build, OpenChemLib's force-field
- * tables, the element data and the prebuilt molecule library.
+ * tables (emitted by the build next to the library), the element data and the prebuilt library.
  */
 import wasmUrl from "@rdkit/rdkit/RDKit_minimal.wasm?url";
 import { setElements, type ElementsPayload } from "./engine/elements";
@@ -15,20 +15,29 @@ import { openStore } from "./engine/storage";
 
 declare const self: DedicatedWorkerGlobalScope;
 
-const base = new URL(import.meta.env.BASE_URL, self.location.origin + "/");
-const asset = (path: string) => new URL(path, base).toString();
-
 const queue: string[] = [];
 let server: LiteServer | null = null;
+let base: URL | null = null;
+const asset = (path: string) => new URL(path, base ?? self.location.href).toString();
 
-self.addEventListener("message", (event: MessageEvent<string>) => {
-  if (typeof event.data !== "string") return;
-  if (server) server.handleLine(event.data);
-  else queue.push(event.data);
+self.addEventListener("message", (event: MessageEvent<unknown>) => {
+  const data = event.data;
+  if (typeof data === "string") {
+    if (server) server.handleLine(data);
+    else queue.push(data);
+    return;
+  }
+  // The page sends its base URL once; loading starts then.
+  if (!base && data && typeof data === "object" && (data as { type?: unknown }).type === "init") {
+    base = new URL(String((data as { base?: unknown }).base ?? "./"), self.location.href);
+    start().catch((err: unknown) => {
+      send(JSON.stringify({ jsonrpc: "2.0", method: "engine.failed", params: { message: String((err as Error)?.message ?? err) } }));
+    });
+  }
 });
 
 const send = (line: string) => self.postMessage(line);
-const loading = (percent: number, stage: string) => send(JSON.stringify({ jsonrpc: "2.0", method: "lite.loading", params: { percent, stage } }));
+const loading = (percent: number, stage: string) => send(JSON.stringify({ jsonrpc: "2.0", method: "engine.loading", params: { percent, stage } }));
 
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(asset(path));
@@ -40,7 +49,7 @@ async function start(): Promise<void> {
   loading(5, "rdkit");
   setRDKitWasmUrl(wasmUrl);
   const rdkitReady = loadRDKit();
-  const oclReady = loadOCL(asset("lite/ocl-resources.json"));
+  const oclReady = loadOCL();
   const [elementsData, libraryData, store] = await Promise.all([
     fetchJson<ElementsPayload>("data/elements.json"),
     fetchJson<{ molecules: unknown[] }>("data/molecules/library.json"),
@@ -61,7 +70,3 @@ async function start(): Promise<void> {
   server.ready();
   for (const line of queue.splice(0)) server.handleLine(line);
 }
-
-start().catch((err: unknown) => {
-  send(JSON.stringify({ jsonrpc: "2.0", method: "lite.failed", params: { message: String((err as Error)?.message ?? err) } }));
-});

@@ -137,7 +137,7 @@ export function toMarkdown(report: Obj, strings: Obj = {}): string {
 
 export function exportReport(report: Obj, format: string, locale = "en", strings: Obj = {}) {
   if (format !== "markdown") {
-    throw new RpcFailure(ENGINE_UNAVAILABLE, "PDF reports are written by the MoleculeForge desktop app; export Markdown here", { code: "DESKTOP_ONLY", format });
+    throw new RpcFailure(ENGINE_UNAVAILABLE, "PDF reports are written by the MoleculeForge desktop app; export Markdown here", { code: "DESKTOP_ONLY", feature: "pdf", format });
   }
   const stem = `repair-report-${slug(text(obj(report["molecule"])["name"]) || "molecule")}`;
   return { format: "markdown", data: toMarkdown(report, strings), encoding: "utf-8", filename: `${stem}.md`, locale };

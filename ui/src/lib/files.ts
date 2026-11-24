@@ -1,8 +1,11 @@
 /**
  * File open/save. In the desktop shell, native dialogs run in Rust and only paths the user
  * picked can be read or written (see app-shell/src-tauri/src/files.rs). In the browser
- * (development / e2e) a hidden file input and a download link are used instead.
+ * (MoleculeForge Lite, development, e2e) a file input and a download link are used instead, and
+ * the Android app saves through its own bridge (the system "save as" picker).
  */
+import { IS_LITE } from "./edition";
+
 export interface FileFilter {
   name: string;
   extensions: string[];
@@ -45,7 +48,45 @@ export async function chooseModelFile(): Promise<{ name: string; path: string; s
   return invoke<{ name: string; path: string; sizeBytes: number } | null>("choose_model");
 }
 
+declare global {
+  interface Window {
+    /** The Android app's bridge (android/.../MainActivity.kt): saves through the system file picker
+     * and answers with window.mfAndroidSaved(requestId, saved). */
+    MoleculeForgeAndroid?: { saveFile(requestId: string, name: string, mime: string, base64: string): void };
+    mfAndroidSaved?: (requestId: string, saved: boolean) => void;
+  }
+}
+
+const MIME: Record<string, string> = {
+  sdf: "chemical/x-mdl-sdfile", mol: "chemical/x-mdl-molfile", smi: "chemical/x-daylight-smiles", smiles: "chemical/x-daylight-smiles",
+  inchi: "chemical/x-inchi", xyz: "chemical/x-xyz", pdb: "chemical/x-pdb", json: "application/json", csv: "text/csv",
+  md: "text/markdown", pdf: "application/pdf", png: "image/png", svg: "image/svg+xml",
+};
+const pendingSaves = new Map<string, (saved: boolean) => void>();
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
+function saveOnAndroid(bridge: NonNullable<Window["MoleculeForgeAndroid"]>, name: string, bytes: Uint8Array): Promise<boolean> {
+  window.mfAndroidSaved ??= (requestId, saved) => {
+    pendingSaves.get(requestId)?.(saved);
+    pendingSaves.delete(requestId);
+  };
+  const requestId = `save-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  return new Promise((resolve) => {
+    pendingSaves.set(requestId, resolve);
+    bridge.saveFile(requestId, name, MIME[ext] ?? "application/octet-stream", bytesToBase64(bytes));
+  });
+}
+
 export async function saveFile(defaultName: string, data: string | Uint8Array, filters: FileFilter[]): Promise<boolean> {
+  if (window.MoleculeForgeAndroid) {
+    return saveOnAndroid(window.MoleculeForgeAndroid, defaultName, typeof data === "string" ? new TextEncoder().encode(data) : data);
+  }
   if (isTauri()) {
     const { invoke } = await import("@tauri-apps/api/core");
     const bytes = typeof data === "string" ? Array.from(new TextEncoder().encode(data)) : Array.from(data);
@@ -61,9 +102,11 @@ export async function saveFile(defaultName: string, data: string | Uint8Array, f
   return true;
 }
 
-export const MOLECULE_FILTERS: FileFilter[] = [
-  { name: "Molecule files", extensions: ["sdf", "mol", "smi", "smiles", "inchi", "xyz", "pdb"] },
-];
+/** Files the app can open. MoleculeForge Lite reads SDF, MOL and SMILES; InChI, XYZ (bond
+ * perception) and PDB need the desktop app's RDKit build. */
+export const MOLECULE_FILTERS: FileFilter[] = IS_LITE
+  ? [{ name: "Molecule files", extensions: ["sdf", "mol", "smi", "smiles"] }]
+  : [{ name: "Molecule files", extensions: ["sdf", "mol", "smi", "smiles", "inchi", "xyz", "pdb"] }];
 
 export function formatFromName(name: string): "sdf" | "mol" | "smiles" | "inchi" | "xyz" | "pdb" | null {
   const ext = name.toLowerCase().split(".").pop() ?? "";

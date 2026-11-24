@@ -9,6 +9,8 @@ import { Badge, Button, cx, ProgressBar } from "@/design-system/primitives";
 import { api } from "@/ipc/api";
 import { RpcError } from "@/ipc/client";
 import type { RepairReport } from "@/ipc/schema";
+import { IS_LITE } from "@/lib/edition";
+import { errorText } from "@/lib/errors";
 import { base64ToBytes, saveFile } from "@/lib/files";
 import { formatNumber } from "@/lib/i18n";
 import { applyCorrected, withCoordinates } from "@/lib/molecule";
@@ -59,7 +61,7 @@ export function RepairDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           onOpenChange(false);
           return;
         }
-        setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
+        setPhase({ kind: "error", message: errorText(err) });
       });
     return () => job.abort();
   }, [open, onOpenChange, t]);
@@ -72,7 +74,7 @@ export function RepairDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       const ok = await saveFile(out.filename, bytes, [{ name: format === "pdf" ? "PDF" : "Markdown", extensions: [format === "pdf" ? "pdf" : "md"] }]);
       if (ok) useApp.getState().pushToast({ tone: "success", title: t("repair.exported", { name: out.filename }) });
     } catch (err) {
-      useApp.getState().pushToast({ tone: "danger", title: t("repair.exportFailed"), body: err instanceof Error ? err.message : String(err) });
+      useApp.getState().pushToast({ tone: "danger", title: t("repair.exportFailed"), body: errorText(err) });
     }
   };
 
@@ -98,9 +100,12 @@ export function RepairDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 <Button variant="ghost" icon={<FileText className="size-4" />} onClick={() => void exportReport("markdown")}>
                   {t("repair.exportMarkdown")}
                 </Button>
-                <Button variant="ghost" icon={<Download className="size-4" />} onClick={() => void exportReport("pdf")}>
-                  {t("repair.exportPdf")}
-                </Button>
+                {/* PDF reports embed fonts and an RDKit drawing: written by the desktop app only. */}
+                {!IS_LITE && (
+                  <Button variant="ghost" icon={<Download className="size-4" />} onClick={() => void exportReport("pdf")}>
+                    {t("repair.exportPdf")}
+                  </Button>
+                )}
               </>
             )}
             <Button variant="primary" onClick={() => onOpenChange(false)}>

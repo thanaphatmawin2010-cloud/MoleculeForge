@@ -8,6 +8,7 @@ import i18next from "i18next";
 import { api } from "@/ipc/api";
 import { RpcError } from "@/ipc/client";
 import type { FixLog, ValidationResult } from "@/ipc/schema";
+import { errorText } from "@/lib/errors";
 import { applyCorrected, type Doc, forgetStereo, stereoKnown, toRdkitLayout, withCoordinates } from "@/lib/molecule";
 import { useApp } from "@/state/app";
 import { useEditor } from "@/state/editor";
@@ -143,7 +144,7 @@ export async function validate(focus: Focus, announce: boolean, { relax = true }
     if (seq !== validationSeq) return;
     useValidation.getState().set({ status: "invalid" });
     if (err instanceof RpcError) {
-      useApp.getState().pushToast({ tone: "danger", title: i18next.t("validation.error"), body: err.message });
+      useApp.getState().pushToast({ tone: "danger", title: i18next.t("validation.error"), body: errorText(err) });
     }
   }
 }

@@ -4,12 +4,15 @@
  * - TauriTransport: the desktop shell relays messages over its IPC (no sockets at all).
  * - BridgeTransport: development/e2e only; a loopback WebSocket to scripts/dev-bridge.mjs,
  *   authenticated with a per-session random token. Never used in packaged builds.
+ * - Lite (web trial and Android builds only): a Web Worker running the WebAssembly engine.
  */
+import { IS_LITE } from "@/lib/edition";
+import { createLiteTransport } from "@/lite/transport";
 
 export interface Transport {
   send(line: string): Promise<void>;
   onMessage(handler: (line: string) => void): () => void;
-  readonly kind: "tauri" | "bridge";
+  readonly kind: "tauri" | "bridge" | "lite";
 }
 
 declare global {
@@ -81,6 +84,7 @@ class BridgeTransport implements Transport {
 const BRIDGE_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_BRIDGE === "1";
 
 export function createTransport(): Transport {
+  if (IS_LITE) return createLiteTransport();
   if (typeof window !== "undefined" && window.__TAURI_INTERNALS__) {
     return new TauriTransport();
   }

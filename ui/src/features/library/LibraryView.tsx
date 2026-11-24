@@ -9,6 +9,7 @@ import { Badge, Button, EmptyState, IconButton, Segmented, cx, inputClass } from
 import { api, type LibraryItem } from "@/ipc/api";
 import type { Molecule, Wedge } from "@/ipc/schema";
 import { FAMILY_CLASS, LIBRARY_FAMILY } from "@/lib/chemistry";
+import { errorText } from "@/lib/errors";
 import { openTextFile, saveFile } from "@/lib/files";
 import { formatNumber } from "@/lib/i18n";
 import type { Vec2 } from "@/lib/molecule";
@@ -130,7 +131,7 @@ export function LibraryView() {
       pushToast({ tone: "success", title: t("library.imported", { count: result.imported }), body: result.duplicates.length ? t("library.importDuplicates", { count: result.duplicates.length }) : undefined });
       refresh();
     } catch (err) {
-      pushToast({ tone: "danger", title: t("library.importFailed"), body: err instanceof Error ? err.message : String(err) });
+      pushToast({ tone: "danger", title: t("library.importFailed"), body: errorText(err) });
     }
   };
 

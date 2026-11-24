@@ -473,7 +473,7 @@ export function parse(fmt: string, data: string, options: { charge?: number; emb
   const name = options.name ?? "";
   if (!text.trim()) throw new RpcFailure(CHEMISTRY_ERROR, "No input data", { code: "EMPTY_INPUT" });
   if (LITE_ONLY_FORMATS.has(fmt)) {
-    throw new RpcFailure(CHEMISTRY_ERROR, `Opening ${fmt.toUpperCase()} files needs the MoleculeForge desktop app`, { code: "DESKTOP_ONLY", format: fmt });
+    throw new RpcFailure(CHEMISTRY_ERROR, `Opening ${fmt.toUpperCase()} files needs the MoleculeForge desktop app`, { code: "DESKTOP_ONLY", feature: "formats", format: fmt });
   }
   const out: Molecule[] = [];
   if (fmt === "sdf" || fmt === "mol") {

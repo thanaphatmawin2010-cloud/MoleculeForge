@@ -10,6 +10,7 @@ compute/dist/
 # Node / UI
 node_modules/
 ui/dist/
+ui/dist-lite/
 ui/coverage/
 ui/test-results/
 ui/playwright-report/

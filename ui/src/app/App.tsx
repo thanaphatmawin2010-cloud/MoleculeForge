@@ -6,6 +6,7 @@ import { type ReactNode, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Toaster } from "@/design-system/overlays";
 import { Badge, IconButton, Kbd, TooltipProvider, cx } from "@/design-system/primitives";
+import { IS_LITE } from "@/lib/edition";
 import { changeLanguage, LOCALES } from "@/lib/i18n";
 import { useApp, type View } from "@/state/app";
 import { useEditor } from "@/state/editor";
@@ -17,6 +18,7 @@ import { SimulateView } from "../features/simulate/SimulateView";
 import { CommandPalette } from "./CommandPalette";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { openMoleculeFile } from "../features/canvas/io";
+import { TrialBanner } from "./LiteNotice";
 import { Logo } from "./Logo";
 import { Onboarding } from "./Onboarding";
 
@@ -30,14 +32,26 @@ const NAV: { id: View; icon: ReactNode; key: string }[] = [
 function SidecarStatus() {
   const { t } = useTranslation();
   const sidecar = useApp((s) => s.sidecar);
+  const error = useApp((s) => s.sidecarError);
+  const progress = useApp((s) => s.engineProgress);
   const caps = useApp((s) => s.capabilities);
   const tone = sidecar === "ready" ? "success" : sidecar === "error" ? "danger" : "neutral";
-  return (
-    <Badge tone={tone} data-testid="engine-status">
-      <span className={cx("size-1.5 rounded-full", sidecar === "ready" ? "bg-success" : sidecar === "error" ? "bg-danger" : "animate-pulse bg-ink-3")} />
-      {sidecar === "ready" && caps
+  let label: string;
+  if (sidecar === "ready") {
+    label = IS_LITE
+      ? t("status.liteReady")
+      : caps
         ? t("status.ready", { device: caps.gpu.accelerated ? t("status.gpu") : t("status.cpu"), cores: caps.cpu.physicalCores ?? "?" })
-        : t(`status.${sidecar}`)}
+        : t("status.starting");
+  } else if (sidecar === "starting" && IS_LITE) {
+    label = t("status.liteStarting", { percent: Math.round(progress ?? 0) });
+  } else {
+    label = t(`status.${sidecar}`);
+  }
+  return (
+    <Badge tone={tone} data-testid="engine-status" title={sidecar === "error" && error ? error : undefined}>
+      <span className={cx("size-1.5 rounded-full", sidecar === "ready" ? "bg-success" : sidecar === "error" ? "bg-danger" : "animate-pulse bg-ink-3")} />
+      {label}
     </Badge>
   );
 }
@@ -152,6 +166,7 @@ export function App() {
               </IconButton>
             </div>
           </header>
+          <TrialBanner />
           <main className="min-h-0 flex-1">
             {/* Enter-only transition: an exit animation with mode="wait" can stall when the view
                 changes again mid-exit (e.g. opening a molecule from the library), leaving no view. */}
