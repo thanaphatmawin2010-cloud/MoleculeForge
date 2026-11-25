@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 8-11 backups: the saved library (the WebView's IndexedDB) and settings. -->
+<full-backup-content>
+    <include domain="root" path="app_webview/" />
+    <include domain="sharedpref" path="." />
+</full-backup-content>

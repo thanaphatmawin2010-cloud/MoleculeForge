@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The web app's background colours (ui/src/design-system/tokens.css), so no flash before it paints. -->
+    <color name="background">#F4F1EA</color>
+    <color name="ic_launcher_background">#17181C</color>
+</resources>

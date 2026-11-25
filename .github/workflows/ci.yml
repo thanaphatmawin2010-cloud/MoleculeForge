@@ -103,4 +103,5 @@ jobs:
           curl -sSL -o osv-scanner https://github.com/google/osv-scanner/releases/download/v2.2.4/osv-scanner_linux_amd64
           chmod +x osv-scanner
           ./osv-scanner scan source --config osv-scanner.toml \
-            --lockfile compute/uv.lock --lockfile pnpm-lock.yaml --lockfile app-shell/src-tauri/Cargo.lock
+            --lockfile compute/uv.lock --lockfile pnpm-lock.yaml --lockfile app-shell/src-tauri/Cargo.lock \
+            --lockfile android/app/gradle.lockfile

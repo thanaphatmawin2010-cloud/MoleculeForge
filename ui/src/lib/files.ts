@@ -50,19 +50,17 @@ export async function chooseModelFile(): Promise<{ name: string; path: string; s
 
 declare global {
   interface Window {
-    /** The Android app's bridge (android/.../MainActivity.kt): saves through the system file picker
-     * and answers with window.mfAndroidSaved(requestId, saved). */
-    MoleculeForgeAndroid?: { saveFile(requestId: string, name: string, mime: string, base64: string): void };
-    mfAndroidSaved?: (requestId: string, saved: boolean) => void;
+    /** The Android app's message channel (android/.../MainActivity.kt, WebViewCompat.addWebMessageListener),
+     * injected only into the app's own origin. It saves through the system "Save as" picker. */
+    MoleculeForgeAndroid?: {
+      postMessage(message: string): void;
+      addEventListener(type: "message", listener: (event: { data: unknown }) => void): void;
+    };
   }
 }
 
-const MIME: Record<string, string> = {
-  sdf: "chemical/x-mdl-sdfile", mol: "chemical/x-mdl-molfile", smi: "chemical/x-daylight-smiles", smiles: "chemical/x-daylight-smiles",
-  inchi: "chemical/x-inchi", xyz: "chemical/x-xyz", pdb: "chemical/x-pdb", json: "application/json", csv: "text/csv",
-  md: "text/markdown", pdf: "application/pdf", png: "image/png", svg: "image/svg+xml",
-};
 const pendingSaves = new Map<string, (saved: boolean) => void>();
+let androidListening = false;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -71,15 +69,23 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function saveOnAndroid(bridge: NonNullable<Window["MoleculeForgeAndroid"]>, name: string, bytes: Uint8Array): Promise<boolean> {
-  window.mfAndroidSaved ??= (requestId, saved) => {
-    pendingSaves.get(requestId)?.(saved);
-    pendingSaves.delete(requestId);
-  };
+  if (!androidListening) {
+    androidListening = true;
+    bridge.addEventListener("message", (event) => {
+      try {
+        const reply = JSON.parse(String(event.data)) as { type?: string; requestId?: string; saved?: boolean };
+        if (reply.type !== "saved" || !reply.requestId) return;
+        pendingSaves.get(reply.requestId)?.(reply.saved === true);
+        pendingSaves.delete(reply.requestId);
+      } catch {
+        /* not a reply to a save */
+      }
+    });
+  }
   const requestId = `save-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const ext = name.toLowerCase().split(".").pop() ?? "";
   return new Promise((resolve) => {
     pendingSaves.set(requestId, resolve);
-    bridge.saveFile(requestId, name, MIME[ext] ?? "application/octet-stream", bytesToBase64(bytes));
+    bridge.postMessage(JSON.stringify({ type: "save", requestId, name, base64: bytesToBase64(bytes) }));
   });
 }
 

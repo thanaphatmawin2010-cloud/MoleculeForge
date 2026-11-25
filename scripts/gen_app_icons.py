@@ -6,6 +6,8 @@ Outputs (committed):
   ui/public-lite/icons/maskable-512.png             full-bleed icon for Android home screens
   android/app/src/main/res/mipmap-*/ic_launcher_foreground.png
                                                     adaptive-icon foreground (108 dp per density)
+  android/app/src/main/res/mipmap-*/ic_launcher_monochrome.png
+                                                    the artwork alone, for Android 13+ themed icons
 
 Run: compute/.venv/bin/python scripts/gen_app_icons.py
 """
@@ -38,6 +40,22 @@ def on_background(image: Image.Image, size: int, fraction: float, background: tu
     return canvas
 
 
+def artwork_only(image: Image.Image) -> Image.Image:
+    """The hexagon and sparks as white on transparent (themed icons tint it): every pixel of the tile
+    that differs from the tile colour, with opacity from that difference."""
+    out = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    src = image.load()
+    dst = out.load()
+    for y in range(image.size[1]):
+        for x in range(image.size[0]):
+            r, g, b, a = src[x, y]
+            distance = max(abs(r - BACKGROUND[0]), abs(g - BACKGROUND[1]), abs(b - BACKGROUND[2]))
+            alpha = min(255, distance * 2) * a // 255
+            if alpha > 24:
+                dst[x, y] = (255, 255, 255, alpha)
+    return out
+
+
 def main() -> int:
     icon = Image.open(SOURCE).convert("RGBA")
     if icon.size != (512, 512):
@@ -54,6 +72,7 @@ def main() -> int:
         folder.mkdir(parents=True, exist_ok=True)
         size = round(108 * factor)
         on_background(icon, size, 72 / 108, (0, 0, 0, 0)).save(folder / "ic_launcher_foreground.png", optimize=True)
+        on_background(artwork_only(icon), size, 72 / 108, (0, 0, 0, 0)).save(folder / "ic_launcher_monochrome.png", optimize=True)
     print(f"wrote web icons to {WEB.relative_to(ROOT)} and launcher icons to {ANDROID_RES.relative_to(ROOT)}")
     return 0
 

@@ -1,0 +1,169 @@
+name: Android app
+
+# MoleculeForge Lite for Android: the web trial's build wrapped in a WebView with no network access.
+# Builds a signed APK (sideloading) and AAB (Google Play), runs Android Lint, and launches the app on an
+# emulator to check the in-browser engine starts. release.yml calls this with the release tag to
+# attach the APK and AAB to the draft release.
+#
+# Signing: with the repository secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD every build has the same signature, so installed copies
+# update in place. Without them each build is signed with a key made for that build alone.
+on:
+  pull_request:
+    paths: ["android/**", "ui/**", "data/**", ".github/workflows/android.yml"]
+  push:
+    branches: [main]
+    paths: ["android/**", "ui/**", "data/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag (vX.Y.Z) whose draft release receives the APK and AAB
+        type: string
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Build the web app
+        run: pnpm --dir ui build:lite
+        env:
+          VITE_DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/latest
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Version
+        run: |
+          if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "MF_VERSION_NAME=${TAG#v}" >> "$GITHUB_ENV"
+            echo "MF_VERSION_CODE=$(( BASH_REMATCH[1] * 10000 + BASH_REMATCH[2] * 100 + BASH_REMATCH[3] ))" >> "$GITHUB_ENV"
+          fi
+
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          keystore="$RUNNER_TEMP/release.keystore"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+            echo "MF_SIGNING=release" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No Android signing secrets: signing with a key made for this build only."
+            KEYSTORE_PASSWORD=$(openssl rand -hex 24); KEY_ALIAS=build; KEY_PASSWORD=$KEYSTORE_PASSWORD
+            keytool -genkeypair -keystore "$keystore" -storetype PKCS12 -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" -alias "$KEY_ALIAS" -keyalg RSA -keysize 3072 -validity 10000 \
+              -dname "CN=MoleculeForge Lite (build ${GITHUB_RUN_ID})"
+            echo "MF_SIGNING=ephemeral" >> "$GITHUB_ENV"
+          fi
+          echo "::add-mask::$KEYSTORE_PASSWORD"
+          echo "::add-mask::$KEY_PASSWORD"
+          {
+            echo "MF_ANDROID_KEYSTORE=$keystore"
+            echo "MF_ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "MF_ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "MF_ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Lint and build (release APK and AAB, debug APK and its test APK)
+        working-directory: android
+        run: ./gradlew --no-daemon :app:lintRelease :app:assembleRelease :app:bundleRelease :app:assembleDebug :app:assembleDebugAndroidTest
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch on an emulator (instrumented test, then a screenshot of the release build)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          working-directory: android
+          script: |
+            ./gradlew --no-daemon :app:connectedDebugAndroidTest
+            adb uninstall com.moleculeforge.lite || true
+            adb install app/build/outputs/apk/release/app-release.apk
+            adb shell am start -W -n com.moleculeforge.lite/.MainActivity
+            sleep 25
+            adb exec-out screencap -p > ../android-screenshot.png
+
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p android-out
+          version="${MF_VERSION_NAME:-dev}"
+          cp android/app/build/outputs/apk/release/app-release.apk "android-out/MoleculeForge-Lite_${version}_android.apk" || true
+          cp android/app/build/outputs/bundle/release/app-release.aab "android-out/MoleculeForge-Lite_${version}_android.aab" || true
+          cp android-screenshot.png android-out/ 2>/dev/null || true
+          cp -r android/app/build/reports android-out/reports 2>/dev/null || true
+          cp -r android/app/build/outputs/androidTest-results android-out/androidTest-results 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android
+          path: android-out
+          retention-days: 90
+
+      - name: Release metadata
+        if: inputs.tag != ''
+        run: |
+          mkdir -p android-meta
+          python3 scripts/release_assets.py split --platform android --out android-release \
+            --meta-out android-meta/android.json --signing "$MF_SIGNING" android-out/*.apk android-out/*.aab
+      - uses: actions/upload-artifact@v4
+        if: inputs.tag != ''
+        with:
+          name: meta-android
+          path: android-meta
+      - uses: actions/upload-artifact@v4
+        if: inputs.tag != ''
+        with:
+          name: android-release
+          path: android-release
+
+  attach:
+    # Attaches the APK and AAB to the draft release (only when called by release.yml).
+    if: inputs.tag != ''
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: android-release
+      - name: Upload to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          for file in android-release/*; do
+            for attempt in 1 2 3 4; do
+              if gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY" --clobber; then continue 2; fi
+              sleep $(( attempt * 15 ))
+            done
+            echo "::error::could not upload $file"; exit 1
+          done
