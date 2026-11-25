@@ -41,7 +41,7 @@ jobs:
         run: pnpm --dir ui build:lite
         env:
           VITE_DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/latest
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@v4
 
@@ -100,13 +100,11 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           working-directory: android
-          script: |
-            ./gradlew --no-daemon :app:connectedDebugAndroidTest
-            adb uninstall com.moleculeforge.lite || true
-            adb install app/build/outputs/apk/release/app-release.apk
-            adb shell am start -W -n com.moleculeforge.lite/.MainActivity
-            sleep 25
-            adb exec-out screencap -p > ../android-screenshot.png
+          script: bash ci/emulator-test.sh
+
+      - name: Report why the emulator test failed (as annotations)
+        if: failure()
+        run: python3 scripts/android_ci_report.py --results android/app/build/outputs/androidTest-results --logcat android-logcat.txt
 
       - name: Collect
         if: always()
@@ -115,7 +113,7 @@ jobs:
           version="${MF_VERSION_NAME:-dev}"
           cp android/app/build/outputs/apk/release/app-release.apk "android-out/MoleculeForge-Lite_${version}_android.apk" || true
           cp android/app/build/outputs/bundle/release/app-release.aab "android-out/MoleculeForge-Lite_${version}_android.aab" || true
-          cp android-screenshot.png android-out/ 2>/dev/null || true
+          cp android-screenshot.png android-failure.png android-logcat.txt android-release-logcat.txt android-out/ 2>/dev/null || true
           cp -r android/app/build/reports android-out/reports 2>/dev/null || true
           cp -r android/app/build/outputs/androidTest-results android-out/androidTest-results 2>/dev/null || true
       - uses: actions/upload-artifact@v4

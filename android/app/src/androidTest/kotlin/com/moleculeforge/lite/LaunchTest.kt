@@ -22,6 +22,7 @@ class LaunchTest {
     @get:Rule
     val activity = ActivityScenarioRule(MainActivity::class.java)
 
+    /** Retries [check] until it passes; on timeout the failure says what the page was showing. */
     private fun eventually(timeoutMs: Long = 120_000, check: () -> Unit) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (true) {
@@ -29,10 +30,24 @@ class LaunchTest {
                 check()
                 return
             } catch (e: Throwable) {
-                if (System.currentTimeMillis() > deadline) throw e
+                if (System.currentTimeMillis() > deadline) throw AssertionError("${e.message}\nPage: ${pageState()}", e)
                 Thread.sleep(500)
             }
         }
+    }
+
+    private fun pageState(): String = try {
+        onWebView().perform(
+            script(
+                "var s = document.querySelector(\"[data-testid='engine-status']\");" +
+                    "return JSON.stringify({href: location.href, ready: document.readyState," +
+                    " status: s ? s.textContent : null, detail: s ? s.title : null," +
+                    " text: document.body ? document.body.innerText.slice(0, 400) : null});",
+                castOrDie(String::class.java),
+            ),
+        ).get()
+    } catch (e: Throwable) {
+        "unavailable ($e)"
     }
 
     // The DOM is read and clicked directly: on a phone the status label is for screen readers only
