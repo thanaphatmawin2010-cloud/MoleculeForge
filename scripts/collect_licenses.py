@@ -7,10 +7,13 @@ Sources (build time only; the application never fetches anything at runtime):
   the CPython interpreter and the PyInstaller bootloader that the frozen sidecar contains;
 * npm production dependencies of the UI (from node_modules);
 * Rust crates linked into the desktop shell (from ``cargo metadata`` and the registry sources);
-* bundled engines, fonts and the language model (texts fetched from their pinned release tags).
+* bundled engines, fonts and the language model (texts fetched from their pinned release tags);
+* the Android app's runtime libraries (android/app/gradle.lockfile; licences from their Maven POMs).
 
 Output: ``LICENSES/<group>/<name>-<version>/<files>`` and ``LICENSES/THIRD_PARTY_NOTICES.md``, an
-index with name, version, SPDX licence and where the text came from. Run from the repository root:
+index with name, version, SPDX licence and where the text came from, plus
+``LICENSES/lite/THIRD_PARTY_LICENSES.txt``: every licence text of what MoleculeForge Lite (the web
+trial and the Android app) ships, in one file the app shows. Run from the repository root:
 
     compute/.venv/bin/python scripts/collect_licenses.py
 """
@@ -22,10 +25,13 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from importlib import metadata
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "LICENSES"
@@ -47,6 +53,11 @@ FETCHED = [
 PYTHON_EXTRA = {
     "openmm": ["https://raw.githubusercontent.com/openmm/openmm/8.6.1/docs-source/licenses/Licenses.txt",
                "https://raw.githubusercontent.com/openmm/openmm/8.6.1/docs-source/licenses/LGPL.txt"],
+}
+# RDKit's WebAssembly build (MoleculeForge Lite) ships no licence file in its npm package; it is
+# built from the RDKit release of the same version, whose licence carries the copyright notice.
+NPM_EXTRA = {
+    "@rdkit/rdkit": ["https://raw.githubusercontent.com/rdkit/rdkit/Release_{major}_{minor:02d}_{patch}/license.txt"],
 }
 # Canonical texts for SPDX ids used by components that do not ship their own licence file.
 SPDX_TEXT = "https://raw.githubusercontent.com/spdx/license-list-data/v3.26.0/text/{id}.txt"
@@ -148,7 +159,7 @@ def npm_entries() -> list[Entry]:
     tree = json.loads(out)
     found: dict[tuple[str, str], Path] = {}
 
-    def walk(deps: dict) -> None:
+    def walk(deps: dict[str, Any]) -> None:
         for name, info in (deps or {}).items():
             key = (name, info.get("version", ""))
             if key not in found and info.get("path"):
@@ -163,8 +174,107 @@ def npm_entries() -> list[Entry]:
         lic = pkg.get("license") if isinstance(pkg.get("license"), str) else (pkg.get("license") or {}).get("type", "see text")
         entry = Entry("npm", name, version, lic or "see text", source=f"npm {name}@{version}")
         copy_texts(entry, [p for p in path.iterdir() if LICENSE_NAME.match(p.name)])
+        if not entry.files and name in NPM_EXTRA:
+            major, minor, patch = (int(x) for x in version.split(".")[:3])
+            for url in NPM_EXTRA[name]:
+                dest = OUT / "npm" / f"{safe(name)}-{safe(version)}" / url.rsplit("/", 1)[1]
+                fetch(url.format(major=major, minor=minor, patch=patch), dest)
+                entry.files.append(str(dest.relative_to(OUT)))
         entries.append(entry)
     return entries
+
+
+MAVEN_REPOS = ["https://dl.google.com/dl/android/maven2", "https://repo.maven.apache.org/maven2"]
+SPDX_BY_NAME = [
+    (re.compile(r"apache.*2\.0|apache-2\.0", re.I), "Apache-2.0"),
+    (re.compile(r"^mit\b|mit license", re.I), "MIT"),
+    (re.compile(r"bsd.*3|3-clause", re.I), "BSD-3-Clause"),
+]
+
+
+def maven_pom(group: str, artifact: str, version: str) -> str:
+    path = f"{group.replace('.', '/')}/{artifact}/{version}/{artifact}-{version}.pom"
+    for repo in MAVEN_REPOS:
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(f"{repo}/{path}", timeout=60) as response:
+                    return str(response.read().decode("utf-8", errors="replace"))
+            except urllib.error.HTTPError as err:
+                if err.code == 404:
+                    break
+                time.sleep(2 * (attempt + 1))  # 429/5xx: back off and retry
+            except OSError:
+                time.sleep(2 * (attempt + 1))
+    raise OSError(f"no POM for {group}:{artifact}:{version}")
+
+
+def maven_licences(group: str, artifact: str, version: str, depth: int = 0) -> list[str]:
+    """Licence names from the POM, or from its parent POMs when the artifact inherits them."""
+    pom = maven_pom(group, artifact, version)
+    names = re.findall(r"<license>\s*<name>\s*([^<]+?)\s*</name>", pom, re.S)
+    if names or depth >= 3:
+        return names
+    parent = re.search(r"<parent>(.*?)</parent>", pom, re.S)
+    if not parent:
+        return names
+    block = parent.group(1)
+
+    def field_of(tag: str) -> str:
+        found = re.search(rf"<{tag}>\s*([^<]+?)\s*</{tag}>", block)
+        return found.group(1) if found else ""
+
+    return maven_licences(field_of("groupId"), field_of("artifactId"), field_of("version"), depth + 1)
+
+
+def android_entries() -> list[Entry]:
+    """Libraries inside the Android APK: the release runtime classpath pinned in gradle.lockfile."""
+    lockfile = ROOT / "android" / "app" / "gradle.lockfile"
+    entries = []
+    for line in lockfile.read_text(encoding="utf-8").splitlines():
+        coordinate, _, configurations = line.partition("=")
+        if "releaseRuntimeClasspath" not in configurations.split(","):
+            continue
+        group, artifact, version = coordinate.split(":")
+        names = maven_licences(group, artifact, version)
+        spdx = []
+        for name in names:
+            spdx.append(next((sid for pattern, sid in SPDX_BY_NAME if pattern.search(name)), name))
+        entries.append(Entry("android", f"{group}:{artifact}", version, " AND ".join(dict.fromkeys(spdx)) or "see source",
+                             source=f"Maven {coordinate}"))
+    return entries
+
+
+def lite_licences(npm: list[Entry], android: list[Entry]) -> str:
+    """One plain-text file with the full licence text of every component MoleculeForge Lite ships."""
+    out = ["MoleculeForge Lite: third-party licences", "=" * 40, "",
+           "MoleculeForge Lite (the web trial and the Android app) includes the open-source components",
+           "below. The web build contains the user-interface packages (npm), among them RDKit's",
+           "WebAssembly build (@rdkit/rdkit) and OpenChemLib (openchemlib); the Android app contains the",
+           "same build plus the Android libraries listed last. Each component's licence text follows.", ""]
+    shared: dict[str, list[str]] = {}
+    for title, entries in (("User interface and chemistry engine (npm)", npm), ("Android app (Maven)", android)):
+        out += [title, "-" * len(title), ""]
+        for e in entries:
+            out.append(f"{e.name} {e.version} ({e.license})")
+            for rel in e.files:
+                if rel.startswith("common/"):
+                    shared.setdefault(rel, []).append(f"{e.name} {e.version}")
+        out.append("")
+    for title, entries in (("Licence texts: npm packages", npm), ("Licence texts: Android libraries", android)):
+        own = [e for e in entries if any(not f.startswith("common/") for f in e.files)]
+        if not own:
+            continue
+        out += ["", title, "=" * len(title)]
+        for e in own:
+            for rel in e.files:
+                if rel.startswith("common/"):
+                    continue
+                out += ["", f"----- {e.name} {e.version}: {Path(rel).name} -----", "",
+                        (OUT / rel).read_text(encoding="utf-8", errors="replace").strip()]
+    for rel, users in sorted(shared.items()):
+        out += ["", f"===== {Path(rel).stem} (canonical text) =====", "", "Applies to: " + ", ".join(users), "",
+                (OUT / rel).read_text(encoding="utf-8", errors="replace").strip()]
+    return "\n".join(out) + "\n"
 
 
 def cargo_entries() -> list[Entry]:
@@ -252,8 +362,11 @@ def main() -> int:
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir()
-    groups = [("Compute sidecar (Python)", python_entries()), ("User interface (npm)", npm_entries()),
-              ("Desktop shell (Rust)", cargo_entries()), ("Engines, model and fonts", fetched_entries())]
+    npm = npm_entries()
+    android = android_entries()
+    groups = [("Compute sidecar (Python)", python_entries()), ("User interface (npm)", npm),
+              ("Desktop shell (Rust)", cargo_entries()), ("Engines, model and fonts", fetched_entries()),
+              ("Android app (Maven)", android)]
     lines = ["# Third-party notices", "",
              "MoleculeForge bundles the components below. Each directory holds the licence text(s) as",
              "published by the project at the shipped version; where a package ships none, the canonical",
@@ -285,6 +398,8 @@ def main() -> int:
             lines.append(f"| {e.name} | {e.version} | {e.license.replace('|', '/')} | {text} |")
         lines.append("")
     (OUT / "THIRD_PARTY_NOTICES.md").write_text("\n".join(lines), encoding="utf-8")
+    (OUT / "lite").mkdir(exist_ok=True)
+    (OUT / "lite" / "THIRD_PARTY_LICENSES.txt").write_text(lite_licences(npm, android), encoding="utf-8")
     total = sum(len(e) for _, e in groups)
     print(f"{total} components, {total - missing} with licence text files, {missing} without (listed by SPDX id)")
     return 0

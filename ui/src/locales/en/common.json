@@ -260,6 +260,13 @@
     "unfavorite": "Remove from favourites"
   },
   "lite": {
+    "about": {
+      "body": "MoleculeForge Lite is the free trial of MoleculeForge. It runs entirely on this device: molecules, results and your library never leave it, and once loaded it works offline.",
+      "engines": "Chemistry: RDKit (WebAssembly build, the same release as the desktop app) and OpenChemLib's MMFF94 force field.",
+      "licences": "Open-source licences",
+      "licencesMissing": "The licence file could not be loaded. It is also published with every release (LICENSES/lite/THIRD_PARTY_LICENSES.txt).",
+      "title": "About MoleculeForge Lite"
+    },
     "banner": {
       "body": "Draw, check, repair and analyse molecules here; nothing leaves your device. Molecular dynamics, docking, quantum chemistry and the AI assistant come with the desktop app.",
       "dismiss": "Hide this message",

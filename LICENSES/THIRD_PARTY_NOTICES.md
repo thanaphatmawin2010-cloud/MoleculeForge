@@ -25,7 +25,7 @@ replaceable files: Meeko as plain Python source in the sidecar's `_internal/meek
 | pyberny | 0.7.0 | MPL-2.0 | python/pyberny-0.7.0/LICENSE |
 | pydantic | 2.14.4 | MIT | python/pydantic-2.14.4/LICENSE |
 | pydantic_core | 2.50.5 | MIT | python/pydantic_core-2.50.5/LICENSE |
-| pyscf | 2.15.1 | Apache-2.0 | python/pyscf-2.15.1/LICENSE<br>python/pyscf-2.15.1/NOTICE |
+| pyscf | 2.15.0 | Apache-2.0 | python/pyscf-2.15.0/LICENSE<br>python/pyscf-2.15.0/NOTICE |
 | rdkit | 2026.9.2 | BSD-3-Clause | python/rdkit-2026.9.2/LICENSE.md<br>python/rdkit-2026.9.2/license.txt |
 | reportlab | 5.1.0 | BSD License | python/reportlab-5.1.0/LICENSE<br>python/reportlab-5.1.0/license.txt |
 | scipy | 1.18.1 | BSD License | python/scipy-1.18.1/LICENSE.txt<br>python/scipy-1.18.1/LICENSE<br>python/scipy-1.18.1/LICENSE.md<br>python/scipy-1.18.1/LICENSE_DOP<br>python/scipy-1.18.1/COPYING_QHULL.txt |
@@ -89,6 +89,7 @@ replaceable files: Meeko as plain Python source in the sidecar's `_internal/meek
 | @radix-ui/react-use-size | 1.1.5 | MIT | npm/_radix-ui_react-use-size-1.1.5/LICENSE |
 | @radix-ui/react-visually-hidden | 1.2.13 | MIT | npm/_radix-ui_react-visually-hidden-1.2.13/LICENSE |
 | @radix-ui/rect | 1.1.3 | MIT | npm/_radix-ui_rect-1.1.3/LICENSE |
+| @rdkit/rdkit | 2026.9.2 | BSD-3-Clause | npm/_rdkit_rdkit-2026.9.2/license.txt |
 | @tauri-apps/api | 2.12.5 | Apache-2.0 OR MIT | npm/_tauri-apps_api-2.12.5/LICENSE-MIT<br>npm/_tauri-apps_api-2.12.5/LICENSE-APACHE-2.0 |
 | @types/prop-types | 15.7.15 | MIT | npm/_types_prop-types-15.7.15/LICENSE |
 | @types/react | 18.3.31 | MIT | npm/_types_react-18.3.31/LICENSE |
@@ -112,6 +113,7 @@ replaceable files: Meeko as plain Python source in the sidecar's `_internal/meek
 | marked | 15.0.12 | MIT | npm/marked-15.0.12/LICENSE.md |
 | motion-dom | 11.18.1 | MIT | npm/motion-dom-11.18.1/LICENSE.md |
 | motion-utils | 11.18.1 | MIT | npm/motion-utils-11.18.1/LICENSE.md |
+| openchemlib | 9.26.0 | BSD-3-Clause | npm/openchemlib-9.26.0/LICENSE |
 | react | 18.3.1 | MIT | npm/react-18.3.1/LICENSE |
 | react-dom | 18.3.1 | MIT | npm/react-dom-18.3.1/LICENSE |
 | react-i18next | 18.0.3 | MIT | npm/react-i18next-18.0.3/LICENSE |
@@ -601,3 +603,57 @@ replaceable files: Meeko as plain Python source in the sidecar's `_internal/meek
 | xtb/tblite | 0.8.0 | LGPL-3.0-or-later | engines/xtb/tblite-0.8.0/COPYING<br>engines/xtb/tblite-0.8.0/COPYING.LESSER |
 | xtb/toml-f | 0.5.2 | Apache-2.0 OR MIT | engines/xtb/toml-f-0.5.2/LICENSE-Apache<br>engines/xtb/toml-f-0.5.2/LICENSE-MIT |
 | IBM-Plex-Sans-Thai | 1.1.0 | OFL-1.1 | fonts/IBM-Plex-Sans-Thai-1.1.0/OFL.txt |
+
+## Android app (Maven)
+
+| Component | Version | Licence | Text |
+|---|---|---|---|
+| androidx.activity:activity-ktx | 1.13.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.activity:activity | 1.13.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.annotation:annotation-experimental | 1.4.1 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.annotation:annotation-jvm | 1.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.annotation:annotation | 1.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.arch.core:core-common | 2.2.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.arch.core:core-runtime | 2.2.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.collection:collection-jvm | 1.4.2 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.collection:collection | 1.4.2 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.compose.runtime:runtime-annotation-android | 1.9.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.compose.runtime:runtime-annotation | 1.9.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.concurrent:concurrent-futures | 1.1.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.core:core-ktx | 1.19.1 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.core:core-viewtree | 1.0.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.core:core | 1.19.1 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.interpolator:interpolator | 1.0.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-common-jvm | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-common | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-livedata-core | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-runtime-android | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-runtime-ktx-android | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-runtime-ktx | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-runtime | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-viewmodel-android | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-viewmodel-ktx | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-viewmodel-savedstate-android | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-viewmodel-savedstate | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.lifecycle:lifecycle-viewmodel | 2.10.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.navigationevent:navigationevent-android | 1.0.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.navigationevent:navigationevent | 1.0.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.profileinstaller:profileinstaller | 1.4.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.savedstate:savedstate-android | 1.4.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.savedstate:savedstate-ktx | 1.4.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.savedstate:savedstate | 1.4.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.startup:startup-runtime | 1.1.1 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.tracing:tracing | 1.2.0 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.versionedparcelable:versionedparcelable | 1.1.1 | Apache-2.0 | common/Apache-2.0.txt |
+| androidx.webkit:webkit | 1.18.0 | Apache-2.0 | common/Apache-2.0.txt |
+| com.google.guava:listenablefuture | 1.0 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains.kotlin:kotlin-stdlib | 2.2.10 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains.kotlinx:kotlinx-coroutines-android | 1.9.0 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains.kotlinx:kotlinx-coroutines-bom | 1.9.0 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm | 1.9.0 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains.kotlinx:kotlinx-coroutines-core | 1.9.0 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains.kotlinx:kotlinx-serialization-bom | 1.7.3 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains.kotlinx:kotlinx-serialization-core-jvm | 1.7.3 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains.kotlinx:kotlinx-serialization-core | 1.7.3 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jetbrains:annotations | 23.0.0 | Apache-2.0 | common/Apache-2.0.txt |
+| org.jspecify:jspecify | 1.0.0 | Apache-2.0 | common/Apache-2.0.txt |

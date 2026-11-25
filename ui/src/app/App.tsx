@@ -18,7 +18,7 @@ import { SimulateView } from "../features/simulate/SimulateView";
 import { CommandPalette } from "./CommandPalette";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { openMoleculeFile } from "../features/canvas/io";
-import { TrialBanner } from "./LiteNotice";
+import { AboutLite, TrialBanner } from "./LiteNotice";
 import { Logo } from "./Logo";
 import { Onboarding } from "./Onboarding";
 
@@ -171,6 +171,7 @@ export function App() {
                   </Dropdown.Content>
                 </Dropdown.Portal>
               </Dropdown.Root>
+              <AboutLite />
               <IconButton label={theme === "dark" ? t("settings.light") : t("settings.dark")} onClick={() => useApp.getState().setTheme(theme === "dark" ? "light" : "dark")} data-testid="theme-toggle">
                 {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
               </IconButton>

@@ -1,8 +1,9 @@
 /** MoleculeForge Lite: the trial banner and the notices that stand in for desktop-only features. */
-import { Download, Monitor, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { Download, Info, Monitor, Sparkles, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { IconButton, cx } from "@/design-system/primitives";
+import { Dialog } from "@/design-system/overlays";
+import { Button, IconButton, cx } from "@/design-system/primitives";
 import { DOWNLOAD_URL, IS_LITE, type DesktopFeature } from "@/lib/edition";
 import { readPreference, writePreference } from "@/lib/preferences";
 
@@ -67,5 +68,50 @@ export function DesktopOnly({ feature, className }: { feature: DesktopFeature; c
       <p className="mt-1 leading-5 text-ink-2">{t(`lite.feature.${feature}.body`)}</p>
       <DownloadLink className="mt-2.5" compact />
     </div>
+  );
+}
+
+/** About MoleculeForge Lite: what the trial is, and the licence of every component it ships. */
+export function AboutLite() {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [licences, setLicences] = useState<string | null>(null);
+  const [showLicences, setShowLicences] = useState(false);
+  useEffect(() => {
+    if (!showLicences || licences !== null) return;
+    fetch(new URL("licenses/THIRD_PARTY_LICENSES.txt", document.baseURI))
+      .then((response) => (response.ok ? response.text() : Promise.reject(new Error(String(response.status)))))
+      .then(setLicences)
+      .catch(() => setLicences(t("lite.about.licencesMissing")));
+  }, [showLicences, licences, t]);
+  if (!IS_LITE) return null;
+  return (
+    <>
+      <IconButton label={t("lite.about.title")} onClick={() => setOpen(true)} data-testid="about-lite">
+        <Info className="size-4" />
+      </IconButton>
+      <Dialog
+        open={open}
+        onOpenChange={setOpen}
+        title={t("lite.about.title")}
+        description={t("lite.banner.title")}
+        footer={DOWNLOAD_URL ? <DownloadLink /> : undefined}
+      >
+        <div className="space-y-3 text-sm leading-6 text-ink-2" data-testid="about-lite-dialog">
+          <p>{t("lite.about.body")}</p>
+          <p>{t("lite.banner.body")}</p>
+          <p className="text-xs text-ink-3">{t("lite.about.engines")}</p>
+          {showLicences ? (
+            <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap rounded bg-surface-2 p-3 font-mono text-2xs leading-4 text-ink-2 hairline" data-testid="licences-text">
+              {licences ?? "…"}
+            </pre>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setShowLicences(true)} data-testid="show-licences">
+              {t("lite.about.licences")}
+            </Button>
+          )}
+        </div>
+      </Dialog>
+    </>
   );
 }

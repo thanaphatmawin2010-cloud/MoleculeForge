@@ -29,6 +29,8 @@ function contentSecurityPolicy(edition: "desktop" | "lite", bridge: boolean): Pl
 const LITE_FILES: Record<string, string> = {
   "data/elements.json": here("../data/elements.json"),
   "data/molecules/library.json": here("../data/molecules/library.json"),
+  // Every licence text of what Lite ships (scripts/collect_licenses.py); shown in the About dialog.
+  "licenses/THIRD_PARTY_LICENSES.txt": here("../LICENSES/lite/THIRD_PARTY_LICENSES.txt"),
 };
 /** Lite-only static files (web-app icons; scripts/gen_app_icons.py). */
 const LITE_PUBLIC = here("./public-lite");
@@ -111,7 +113,7 @@ function liteAssets(): Plugin {
         }
         const file = LITE_FILES[path] ?? (path.startsWith("icons/") && existsSync(join(LITE_PUBLIC, path)) ? join(LITE_PUBLIC, path) : undefined);
         if (!file) return next();
-        res.setHeader("Content-Type", file.endsWith(".png") ? "image/png" : "application/json; charset=utf-8");
+        res.setHeader("Content-Type", file.endsWith(".png") ? "image/png" : file.endsWith(".txt") ? "text/plain; charset=utf-8" : "application/json; charset=utf-8");
         res.end(readFileSync(file));
       });
     },

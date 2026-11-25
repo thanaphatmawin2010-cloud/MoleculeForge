@@ -158,6 +158,18 @@ test("installable, and works offline after the first visit", async ({ page, cont
   await context.setOffline(false);
 });
 
+test("About shows every bundled licence, RDKit's included", async ({ page }) => {
+  await start(page);
+  await page.getByTestId("about-lite").click();
+  await expect(page.getByTestId("about-lite-dialog")).toBeVisible();
+  await page.getByTestId("show-licences").click();
+  const text = page.getByTestId("licences-text");
+  await expect(text).toContainText("@rdkit/rdkit 2026.9.2 (BSD-3-Clause)");
+  await expect(text).toContainText("Rational Discovery LLC");
+  await expect(text).toContainText("openchemlib");
+  await expect(text).toContainText("androidx.webkit:webkit");
+});
+
 test("periodic table: all 118 elements with details", async ({ page }) => {
   await start(page);
   await page.keyboard.press("Control+2");
