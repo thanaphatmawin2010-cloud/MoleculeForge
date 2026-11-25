@@ -7,7 +7,8 @@ molecules, and real property calculations: force fields, GFN2-xTB, PM7 and B3LYP
 dynamics and docking. A local AI assistant answers by calling those same tools. It runs entirely on
 your computer, with no network access at runtime, in English and Thai.
 
-* **Try it first:** MoleculeForge Lite, a free trial, runs in a web browser and on Android; see
+* **Try it first:** MoleculeForge Lite, a free trial, runs in your browser at
+  **https://thanaphatmawin2010-cloud.github.io/MoleculeForge/** and on Android; see
   [below](#try-it-moleculeforge-lite-web-and-android).
 * **For users:** see [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 * **For developers:** see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [BUILD_LOG.md](BUILD_LOG.md).
