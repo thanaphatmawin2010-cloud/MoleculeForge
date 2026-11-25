@@ -58,3 +58,11 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((error: unknown) => window.mfShowFatal?.(error));
+
+// The web trial caches itself for offline use (ui/vite.config.ts writes sw.js). The Android app
+// already ships every file and the desktop app has no web server, so neither registers one.
+if (IS_LITE && import.meta.env.PROD && "serviceWorker" in navigator && !window.MoleculeForgeAndroid) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register(new URL("sw.js", document.baseURI)).catch(() => undefined);
+  });
+}

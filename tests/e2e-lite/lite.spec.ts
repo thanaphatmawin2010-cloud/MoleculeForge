@@ -128,6 +128,36 @@ test("library: 187 prebuilt molecules, sorting, and a saved molecule survives a 
   await expect(page.locator('[data-testid^="library-card-"]').first()).toContainText("neopentyl alcohol");
 });
 
+test("installable, and works offline after the first visit", async ({ page, context }) => {
+  await start(page);
+  const manifest = await page.evaluate(async () => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!;
+    return (await fetch(link.href)).json() as Promise<{ display: string; icons: { purpose?: string }[] }>;
+  });
+  expect(manifest.display).toBe("standalone");
+  expect(manifest.icons.map((icon) => icon.purpose ?? "any")).toContain("maskable");
+
+  // The service worker caches the whole app; then the page reloads with the network off.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  const cached = () => page.evaluate(async () => {
+    const keys = await caches.keys();
+    return keys.length ? (await (await caches.open(keys[0]!)).keys()).length : 0;
+  });
+  await expect.poll(cached, { timeout: 120_000 }).toBeGreaterThan(30);
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByTestId("engine-status")).toHaveClass(/success/, { timeout: 120_000 });
+  expect(await page.evaluate(() => fetch("data/not-cached.json").then(() => "network", () => "offline"))).toBe("offline");
+  await page.getByTestId("template-benzene").click();
+  await expect(page.getByTestId("formula")).toHaveText("C6H6");
+  await page.keyboard.press("Control+4");
+  await page.getByRole("button", { name: "Run" }).click();
+  await expect(page.getByTestId("prop-molecularWeight")).toContainText("78.11", { timeout: 120_000 });
+  await context.setOffline(false);
+});
+
 test("periodic table: all 118 elements with details", async ({ page }) => {
   await start(page);
   await page.keyboard.press("Control+2");
