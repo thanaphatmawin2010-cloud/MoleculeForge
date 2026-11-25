@@ -178,7 +178,7 @@ that import to a stub, so none of it is in the installers.
   permission. Saving goes through `ACTION_CREATE_DOCUMENT` over a message channel injected only into
   that origin (`addWebMessageListener`), opening through the WebView file chooser, and other links
   open in the browser. `.github/workflows/android.yml` lints, builds the signed APK and AAB, and
-  runs an Espresso-Web test on an emulator.
+  runs an instrumented test on an emulator (it drives the page through the WebView itself).
 * **Phones.** Below 768 px the layout changes in CSS (`max-md:`) and `useIsPhone()`: a bottom tab
   bar, one canvas pane at a time, the inspector as a bottom sheet, full-screen overlays. The sketcher
   takes two-finger pan and pinch zoom, and touch edits run on finger-up so a pinch never edits.

@@ -15,7 +15,16 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-RELEVANT = re.compile(r"chromium|Console|AndroidRuntime|FATAL|TestRunner|cr_|WebView|moleculeforge|System\.err", re.IGNORECASE)
+RELEVANT = re.compile(
+    r"chromium|Console|AndroidRuntime|FATAL|TestRunner|cr_|WebView|moleculeforge|System\.err|ANR|not responding|WindowFocus|keyguard",
+    re.IGNORECASE,
+)
+# Package-manager and system-service chatter about installing and removing the test packages.
+NOISE = re.compile(
+    r"WifiService|WifiConfigManager|PasspointManager|ShortcutService|MediaProvider|MediaGrants|Blockstore|AppWidgetService|"
+    r"CarrierSvcBindHelper|AppsFilter|ProximityAuth|ProcessStats|ApkAssets|Telecom|Icing|LauncherApps|SQLiteLog|"
+    r"ConditionProviders|PersistedStorage|RollbackManager|StorageManagerService|ziparchive|nativeloader|TestRunner:\s+at |TestRunner:\s+\.\.\."
+)
 MAX_ANNOTATIONS = 9
 CHUNK = 6000
 
@@ -48,16 +57,22 @@ def main() -> int:
         annotate("No instrumented test results", f"nothing under {opts.results}: the test did not run to completion")
         used += 1
     if opts.logcat.exists():
-        lines = [line for line in opts.logcat.read_text(encoding="utf-8", errors="replace").splitlines() if RELEVANT.search(line)]
+        lines = [line for line in opts.logcat.read_text(encoding="utf-8", errors="replace").splitlines()
+                 if RELEVANT.search(line) and not NOISE.search(line)]
+        # The start of the run (launch, page load) and its end (failure, focus) explain most failures.
+        picked = lines if len(lines) <= 240 else [*lines[:120], "[...]", *lines[-120:]]
         chunks, current = [], ""
-        for line in lines[-400:]:
+        for line in picked:
             if len(current) + len(line) + 1 > CHUNK:
                 chunks.append(current)
                 current = ""
             current += line + "\n"
         if current:
             chunks.append(current)
-        for index, chunk in enumerate(chunks[-(MAX_ANNOTATIONS - used):]):
+        keep = MAX_ANNOTATIONS - used
+        if len(chunks) > keep:
+            chunks = [*chunks[: keep // 2], *chunks[-(keep - keep // 2):]]
+        for index, chunk in enumerate(chunks):
             annotate(f"Device log ({index + 1})", chunk)
     else:
         annotate("No device log", f"{opts.logcat} was not written")

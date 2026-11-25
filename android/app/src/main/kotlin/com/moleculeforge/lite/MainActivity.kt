@@ -19,6 +19,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.VisibleForTesting
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -135,8 +136,17 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (!webViewDestroyed) webView.destroy()
+        if (!webViewDestroyed) {
+            (webView.parent as? ViewGroup)?.removeView(webView)
+            webView.destroy()
+        }
         super.onDestroy()
+    }
+
+    /** Runs [script] in the page and passes its JSON-encoded result (instrumented tests). */
+    @VisibleForTesting
+    internal fun evaluateForTest(script: String, result: (String) -> Unit) {
+        webView.evaluateJavascript(script) { value -> result(value ?: "null") }
     }
 
     /** `{type: "save", requestId, name, base64}` from ui/src/lib/files.ts: ask where to save, then write. */

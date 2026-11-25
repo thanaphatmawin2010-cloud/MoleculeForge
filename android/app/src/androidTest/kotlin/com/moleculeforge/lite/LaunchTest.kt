@@ -1,14 +1,10 @@
 package com.moleculeforge.lite
 
-import androidx.test.espresso.web.assertion.WebViewAssertions.webMatches
-import androidx.test.espresso.web.model.Atom
-import androidx.test.espresso.web.model.Atoms.castOrDie
-import androidx.test.espresso.web.model.Atoms.getCurrentUrl
-import androidx.test.espresso.web.model.Atoms.script
-import androidx.test.espresso.web.sugar.Web.onWebView
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import org.hamcrest.Matchers.containsString
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -16,54 +12,57 @@ import org.junit.runner.RunWith
 /**
  * Launches the app with no network access and checks that the bundled web app loads, the
  * WebAssembly engine starts in its worker, and a template can be drawn and validated.
+ *
+ * The page is read and driven through the WebView's own evaluateJavascript rather than
+ * Espresso-Web, which waits for the window to have input focus: on CI emulators a lock screen or a
+ * system dialog can hold focus for the whole run although the app works.
  */
 @RunWith(AndroidJUnit4::class)
 class LaunchTest {
     @get:Rule
     val activity = ActivityScenarioRule(MainActivity::class.java)
 
-    /** Retries [check] until it passes; on timeout the failure says what the page was showing. */
-    private fun eventually(timeoutMs: Long = 120_000, check: () -> Unit) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (true) {
-            try {
-                check()
-                return
-            } catch (e: Throwable) {
-                if (System.currentTimeMillis() > deadline) throw AssertionError("${e.message}\nPage: ${pageState()}", e)
-                Thread.sleep(500)
+    /** Runs JavaScript in the app's page and returns its JSON-encoded result. */
+    private fun js(script: String): String {
+        val done = CountDownLatch(1)
+        val result = AtomicReference("null")
+        activity.scenario.onActivity { app ->
+            app.evaluateForTest(script) { value ->
+                result.set(value)
+                done.countDown()
             }
+        }
+        check(done.await(15, TimeUnit.SECONDS)) { "the page did not answer within 15 s" }
+        return result.get()
+    }
+
+    private fun text(testId: String): String =
+        js("(function () { var e = document.querySelector(\"[data-testid='$testId']\"); return e ? e.textContent : ''; })()")
+
+    private fun pageState(): String = runCatching {
+        js(
+            "JSON.stringify({href: location.href, ready: document.readyState," +
+                " status: (document.querySelector(\"[data-testid='engine-status']\") || {}).textContent," +
+                " detail: (document.querySelector(\"[data-testid='engine-status']\") || {}).title," +
+                " text: document.body ? document.body.innerText.slice(0, 400) : null})",
+        )
+    }.getOrElse { "unavailable ($it)" }
+
+    /** Waits for [condition]; a failure says what the page was showing. An engine error fails at once. */
+    private fun waitFor(what: String, timeoutMs: Long = 120_000, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (!condition()) {
+            if (text("engine-status").contains("error", ignoreCase = true)) throw AssertionError("The engine reported an error while waiting for $what. Page: ${pageState()}")
+            if (System.currentTimeMillis() > deadline) throw AssertionError("Timed out waiting for $what. Page: ${pageState()}")
+            Thread.sleep(500)
         }
     }
 
-    private fun pageState(): String = try {
-        onWebView().perform(
-            script(
-                "var s = document.querySelector(\"[data-testid='engine-status']\");" +
-                    "return JSON.stringify({href: location.href, ready: document.readyState," +
-                    " status: s ? s.textContent : null, detail: s ? s.title : null," +
-                    " text: document.body ? document.body.innerText.slice(0, 400) : null});",
-                castOrDie(String::class.java),
-            ),
-        ).get()
-    } catch (e: Throwable) {
-        "unavailable ($e)"
-    }
-
-    // The DOM is read and clicked directly: on a phone the status label is for screen readers only
-    // and the template button may be scrolled out of the toolbar, which WebDriver's visible-text
-    // and click atoms would treat as missing.
-    private fun textOf(testId: String): Atom<String> =
-        script("var e = document.querySelector(\"[data-testid='$testId']\"); return e ? e.textContent : '';", castOrDie(String::class.java))
-
-    private fun click(testId: String): Atom<Boolean> =
-        script("document.querySelector(\"[data-testid='$testId']\").click(); return true;", castOrDie(Boolean::class.javaObjectType))
-
     @Test
     fun engineStartsAndValidatesADrawing() {
-        eventually { onWebView().check(webMatches(getCurrentUrl(), containsString(MainActivity.START_URL))) }
-        eventually { onWebView().check(webMatches(textOf("engine-status"), containsString("runs on this device"))) }
-        onWebView().perform(click("template-benzene"))
-        eventually(30_000) { onWebView().check(webMatches(textOf("phone-formula"), containsString("C6H6"))) }
+        waitFor("the app page") { js("location.href.indexOf('/assets/index.html') >= 0") == "true" }
+        waitFor("the engine") { text("engine-status").contains("runs on this device") }
+        js("document.querySelector(\"[data-testid='template-benzene']\").click()")
+        waitFor("the drawn template", 30_000) { text("phone-formula").contains("C6H6") }
     }
 }
