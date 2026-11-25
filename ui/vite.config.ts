@@ -161,6 +161,8 @@ export default defineConfig(({ mode, command }) => {
       ],
     },
     clearScreen: false,
+    // Scan only the app's own entry for dependencies (not dist-lite/ or test reports in this folder).
+    optimizeDeps: { entries: ["index.html"] },
     server: { host: "127.0.0.1", port: lite ? 5174 : 5173, strictPort: true },
     worker: { format: "es" },
     build: {

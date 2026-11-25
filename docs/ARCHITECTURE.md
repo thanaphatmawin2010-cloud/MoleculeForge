@@ -146,15 +146,53 @@ data folder.
    on macOS; see `.github/workflows/release.yml`). The Linux AppImage comes from
    `scripts/build_appimage.py`, because Tauri's AppImage step cannot scan the engine payload.
 
+## MoleculeForge Lite (web trial and Android app)
+
+The trial edition reuses the whole UI. Only the transport changes: `pnpm build:lite` (Vite mode
+`lite`, `ui/.env.lite`) resolves `@/lite/transport` to a Web Worker (`ui/src/lite/worker.ts`) that
+runs a TypeScript port of the sidecar's chemistry (`ui/src/lite/engine/`) and answers the same
+JSON-RPC 2.0 lines, so `api.ts`, the schemas and every view work unchanged. Desktop builds resolve
+that import to a stub, so none of it is in the installers.
+
+* **Engines.** RDKit's WebAssembly build (`@rdkit/rdkit`, the same release as the sidecar's RDKit)
+  does parsing, canonical SMILES, InChI, descriptors, substructure search and 2D depiction; RDKit's
+  internal perceptions it does not expose (implicit hydrogens, Kekulé assignment, hybridisation,
+  ring membership) are read back through its JSON output and SMARTS primitives. OpenChemLib
+  provides what MinimalLib lacks: 3D conformers and the MMFF94/MMFF94s force field. Validation,
+  fixes, repair, properties (descriptors, QED, Gasteiger charges, pKa estimates, shape, SASA), the
+  library (IndexedDB) and Markdown reports are ports of the Python modules.
+* **Parity.** `scripts/gen_lite_parity.py` runs the sidecar's own functions on 38 scenarios, 400
+  random structures and the 187 library molecules and stores the results; `tests/unit/lite/`
+  checks the browser engine against them field by field (messages, fixes, atom maps, formulas,
+  SMILES, InChIKeys, categories and every descriptor).
+* **Desktop-only methods** (molecular dynamics, docking, xtb/MOPAC/PySCF levels, the assistant, PDF
+  reports, InChI/XYZ/PDB import) answer `ENGINE_UNAVAILABLE` with `data.code = "DESKTOP_ONLY"` and
+  the feature; the UI never offers them (`IS_LITE` in `ui/src/lib/edition.ts`) and explains them
+  where they would be (`ui/src/app/LiteNotice.tsx`).
+* **Web.** Relative URLs (works under any path), a CSP allowing only the page's own origin plus
+  `'wasm-unsafe-eval'`, a web app manifest, and a service worker generated after the build that
+  caches every file under a content hash, so the trial installs and runs offline.
+  `.github/workflows/pages.yml` tests the built site and deploys it to GitHub Pages.
+* **Android** (`android/`). One activity with a WebView. `WebViewAssetLoader` serves the build from
+  the APK's assets at `https://appassets.androidplatform.net/assets/`; the app has no INTERNET
+  permission. Saving goes through `ACTION_CREATE_DOCUMENT` over a message channel injected only into
+  that origin (`addWebMessageListener`), opening through the WebView file chooser, and other links
+  open in the browser. `.github/workflows/android.yml` lints, builds the signed APK and AAB, and
+  runs an Espresso-Web test on an emulator.
+* **Phones.** Below 768 px the layout changes in CSS (`max-md:`) and `useIsPhone()`: a bottom tab
+  bar, one canvas pane at a time, the inspector as a bottom sheet, full-screen overlays. The sketcher
+  takes two-finger pan and pinch zoom, and touch edits run on finger-up so a pinch never edits.
+
 ## Repository layout
 
 ```
 app-shell/src-tauri/   Rust shell, Tauri config, capabilities, icons
-ui/                    React UI (src/design-system, features, locales, ipc, lib, state)
+ui/                    React UI (src/design-system, features, locales, ipc, lib, state; src/lite: the Lite engine)
+android/               Android app (Kotlin WebView wrapper of the Lite build)
 compute/               Python sidecar package (mfcompute: chem/, sim/, data/, ai/, server.py), PyInstaller spec
 data/                  elements.json, molecules/, knowledge/, models/ (fetched), fonts/ (fetched)
 scripts/               fetch, build, licence, staging and report generators
-tests/                 unit/, integration/, chem-validation/, e2e/
+tests/                 unit/ (lite/: parity), integration/, chem-validation/, e2e/, e2e-lite/
 docs/                  architecture, user guide, validation report, adding a locale
 LICENSES/              third-party licence texts (generated)
 ```

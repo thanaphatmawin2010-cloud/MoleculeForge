@@ -52,6 +52,41 @@ On Windows, two things differ:
   after repair; its bond angles are within 1.5° of experiment for water, ammonia, hydrogen
   sulfide and phosphine.
 
+## Trying MoleculeForge Lite (web browser or Android)
+
+MoleculeForge Lite is a free trial with the same screens. Its chemistry engine (RDKit and
+OpenChemLib, compiled to WebAssembly) runs on your phone, tablet or computer: nothing you draw or
+compute is uploaded.
+
+* **In a browser:** open the trial's web address (the release notes link it). The first visit
+  downloads the chemistry engine (several megabytes); after that it opens from the device and works
+  offline. To keep it like an
+  app, use the browser's **Install** or **Add to Home screen**. It needs Chrome or Edge 80, Firefox
+  114, Safari 15 or newer (for WebAssembly in a background worker).
+* **On Android (8.0 or newer):** download `MoleculeForge-Lite_…_android.apk` from the Releases page
+  on the phone and open it. Allow installing apps from your browser or Files app when asked, then
+  tap **Install**. If Google Play Protect warns about an unknown developer, tap **More details**,
+  then **Install anyway**. The app has no internet access at all.
+
+What the trial includes: drawing with live bond validation and automatic fixes, one-click repair
+(MMFF94 geometry) with its report (exported as Markdown), molecular properties (descriptors,
+drug-likeness rules, pKa estimates, an MMFF94 geometry, shape and surface areas), minimisation with
+MMFF94 or MMFF94s, the periodic table, and the molecule library. Molecular dynamics, docking,
+quantum chemistry (GFN2-xTB, PM7, B3LYP: energies, orbitals, IR spectra, thermochemistry), the AI
+assistant, PDF reports and opening InChI, XYZ or PDB files are in the desktop app; the trial marks
+each of them and links to the download. **About** (the ⓘ button in the top bar) lists the
+open-source components and their licences.
+
+**On a phone** the navigation moves to the bottom of the screen, and the drawing area shows 2D or 3D
+(switch at the bottom of the canvas). Tap an element, then tap the canvas to place an atom; drag
+outward from an atom to bond a new one; with two fingers, drag to move the view and pinch to zoom.
+The bar under the tools shows whether all bonds are valid and the formula: tap it for the full
+inspector (name, weight, selection, settings).
+
+**Your saved molecules** are kept by the browser (or the app) on that device. Clearing the site's
+data, or uninstalling the app, removes them, so use **Library → Export SDF** to keep a copy. Files
+you export are downloaded by the browser; on Android, a **Save as** screen asks where to put them.
+
 ## Your first molecule (about one minute)
 
 The first time you open the app, a short guide builds water with you:
@@ -172,7 +207,7 @@ the light and dark themes.
 ## Files
 
 **Open** (Ctrl O, or from the command palette) reads MOL, SDF, SMILES, InChI, XYZ and PDB files of
-up to 64 MB. Opened files are treated as untrusted and checked before use. **Export** writes the
+up to 64 MB (MoleculeForge Lite opens MOL, SDF and SMILES). Opened files are treated as untrusted and checked before use. **Export** writes the
 same formats; the round trip keeps connectivity, charges, isotopes, stereochemistry and coordinates.
 
 ## Troubleshooting

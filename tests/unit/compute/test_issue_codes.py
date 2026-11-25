@@ -73,19 +73,33 @@ def test_auto_fix_reports_bond_connection_fixed_successfully() -> None:
     assert fix["reason"] == "VALENCE_EXCEEDED" and fix["reasonParams"]["atom"] == 1
 
 
+def lite_warning_texts() -> dict[str, str]:
+    """Warning codes of MoleculeForge Lite's browser engine (its TEXT table in properties.ts)."""
+    import re
+
+    source = (ROOT / "ui" / "src" / "lite" / "engine" / "properties.ts").read_text(encoding="utf-8")
+    block = re.search(r"const TEXT: Record<string, string> = \{(.*?)\n\};", source, re.S)
+    assert block, "TEXT table not found in ui/src/lite/engine/properties.ts"
+    return dict(re.findall(r'(\w+):\s*"((?:[^"\\]|\\.)*)"', block.group(1)))
+
+
 def test_every_simulation_warning_is_localised_with_the_same_parameters() -> None:
-    """Simulation warnings reach the UI as codes; each needs text in every locale using its parameters."""
+    """Simulation warnings reach the UI as codes, from the sidecar or from MoleculeForge Lite's engine;
+    each needs text in every locale using its parameters, and the locales hold no other codes."""
     import re
 
     from mfcompute.sim import notes
 
+    lite = lite_warning_texts()
+    assert "liteEngines" in lite
+    texts = {**lite, **notes.TEXT}
     placeholder = re.compile(r"{(\w+)}")
     languages = sorted(p.name for p in (ROOT / "ui" / "src" / "locales").iterdir() if (p / "common.json").exists())
     assert {"en", "th"} <= set(languages)
     for lang in languages:
         locale = json.loads((ROOT / "ui" / "src" / "locales" / lang / "common.json").read_text(encoding="utf-8"))["simWarning"]
-        assert set(notes.TEXT) == set(locale), lang
-        for code, english in notes.TEXT.items():
+        assert set(texts) == set(locale), lang
+        for code, english in texts.items():
             wanted = set(placeholder.findall(english))
             used = set(re.findall(r"{(\w+)[,}]", locale[code]))
             assert wanted <= used, (lang, code, wanted - used)

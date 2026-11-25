@@ -7,6 +7,8 @@ molecules, and real property calculations: force fields, GFN2-xTB, PM7 and B3LYP
 dynamics and docking. A local AI assistant answers by calling those same tools. It runs entirely on
 your computer, with no network access at runtime, in English and Thai.
 
+* **Try it first:** MoleculeForge Lite, a free trial, runs in a web browser and on Android; see
+  [below](#try-it-moleculeforge-lite-web-and-android).
 * **For users:** see [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 * **For developers:** see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [BUILD_LOG.md](BUILD_LOG.md).
 * **Scientific validation:** see [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md).
@@ -23,6 +25,23 @@ are joined with one command before installing. The installers are not code-signe
 macOS ask for confirmation on first launch. Windows installers cannot exceed 2 GB, so they bundle a
 smaller model, and B3LYP (PySCF) is not available on Windows. The
 [user guide](docs/USER_GUIDE.md#installing) covers all of this step by step.
+
+## Try it: MoleculeForge Lite (web and Android)
+
+MoleculeForge Lite is the trial edition: the same interface running on a chemistry engine compiled to
+WebAssembly (RDKit, the same release as the desktop app, plus OpenChemLib's MMFF94), entirely on the
+device. It draws, validates and repairs structures live, computes descriptors, MMFF94 geometries,
+shape and surface areas, and includes the periodic table and the molecule library (saved molecules
+stay in the browser or app). Molecular dynamics, docking, quantum chemistry (GFN2-xTB, PM7, B3LYP),
+the AI assistant, PDF reports and InChI/XYZ/PDB import are desktop-only; the trial shows where each
+one would be and links to the download. It works on phones (touch drawing, pinch zoom).
+
+* **Web:** published by [.github/workflows/pages.yml](.github/workflows/pages.yml) to the
+  repository's GitHub Pages site (`https://<owner>.github.io/<repository>/`; one-time setup:
+  *Settings > Pages > Source: GitHub Actions*). It can be installed from the browser and then works
+  offline. The page requests nothing from any other site.
+* **Android 8.0 or newer:** the `.apk` on the Releases page (and the `.aab` for Google Play). The app
+  has no internet permission at all.
 
 ## Build from source
 
@@ -104,6 +123,41 @@ pnpm --dir ui dev
 
 Then open the URL the bridge prints.
 
+### MoleculeForge Lite (web trial and Android app)
+
+```bash
+pnpm --dir ui build:lite           # → ui/dist-lite (serve it with: pnpm --dir ui preview:lite)
+pnpm --dir ui dev:lite             # development server on http://127.0.0.1:5174
+```
+
+The Android app wraps `ui/dist-lite` (build it first). With JDK 17 or newer and the Android SDK
+(`ANDROID_HOME`), from `android/`:
+
+```bash
+./gradlew assembleRelease bundleRelease
+```
+
+The APK is signed when `MF_ANDROID_KEYSTORE`, `MF_ANDROID_KEYSTORE_PASSWORD`, `MF_ANDROID_KEY_ALIAS`
+and `MF_ANDROID_KEY_PASSWORD` are set. For release builds in CI, create a key once with `keytool` (part of
+every Java JDK and of Android Studio), and keep the file and its password safe: every future update
+must be signed with it.
+
+```bash
+keytool -genkeypair -keystore moleculeforge-release.jks -alias moleculeforge -keyalg RSA -keysize 4096 -validity 10000
+```
+
+```bash
+base64 < moleculeforge-release.jks
+```
+
+and add the repository secrets (*Settings > Secrets and variables > Actions*):
+`ANDROID_KEYSTORE_BASE64` (the second command's output), `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS` (`moleculeforge`) and `ANDROID_KEY_PASSWORD` (the same password: keytool's
+default PKCS12 keystores use one password). Every release then updates installed copies in place;
+without the secrets each build gets its own key. After changing an Android dependency, refresh the
+lockfile with `./gradlew :app:dependencies --write-locks`. The launcher and web-app icons come from
+the desktop icon: `compute/.venv/bin/python scripts/gen_app_icons.py`.
+
 ## Tests
 
 | Suite | Command |
@@ -115,7 +169,10 @@ Then open the URL the bridge prints.
 | Local assistant (slow, CPU) | `cd compute && uv run pytest -m slow` |
 | Shell (Rust) | `cd app-shell/src-tauri && cargo test` |
 | End to end (Playwright) + accessibility (axe) | `pnpm --dir ui e2e` |
-| Dependency audit | `osv-scanner scan source --config osv-scanner.toml --lockfile compute/uv.lock --lockfile pnpm-lock.yaml --lockfile app-shell/src-tauri/Cargo.lock` |
+| Lite engine: parity with the desktop engine (Vitest, part of the UI suite) | `pnpm --dir ui exec vitest run ../tests/unit/lite` |
+| Lite end to end: desktop and phone sizes, offline, accessibility | `pnpm --dir ui build:lite && pnpm --dir ui e2e:lite` |
+| Android: lint, build, instrumented test on a device or emulator | `cd android && ./gradlew lintRelease assembleRelease connectedDebugAndroidTest` |
+| Dependency audit | `osv-scanner scan source --config osv-scanner.toml --lockfile compute/uv.lock --lockfile pnpm-lock.yaml --lockfile app-shell/src-tauri/Cargo.lock --lockfile android/app/gradle.lockfile` |
 | Validation report | `compute/.venv/bin/python scripts/validation_report.py` |
 | Installed app: cold start and offline socket audit | `xvfb-run -a compute/.venv/bin/python scripts/launch_check.py --binary /usr/bin/moleculeforge` |
 
@@ -123,12 +180,14 @@ Then open the URL the bridge prints.
 
 ```
 app-shell/   Tauri 2 shell (Rust): window, IPC allowlist, sidecar lifecycle, file dialogs
-ui/          React + TypeScript UI: design system, features, locales (ICU), typed IPC client
+ui/          React + TypeScript UI: design system, features, locales (ICU), typed IPC client;
+             ui/src/lite: MoleculeForge Lite's WebAssembly engine (same JSON-RPC methods, Web Worker)
+android/     Android app (Kotlin): a WebView around the Lite build, no network permission
 compute/     Python sidecar (mfcompute): chem/, sim/, data/, ai/, JSON-RPC server, PyInstaller spec
 data/        elements.json (118), molecules/ (prebuilt library), knowledge/ (assistant references)
 scripts/     engine fetching, data builds, licence collection, staging, AppImage assembly,
              validation report, installed-app launch check
-tests/       unit/, integration/, chem-validation/, e2e/
+tests/       unit/ (lite/: parity with the desktop engine), integration/, chem-validation/, e2e/, e2e-lite/
 docs/        architecture, user guide, validation report, adding a locale
 LICENSES/    third-party licence texts (generated by scripts/collect_licenses.py)
 ```

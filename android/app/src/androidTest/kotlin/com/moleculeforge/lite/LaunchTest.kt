@@ -1,12 +1,11 @@
 package com.moleculeforge.lite
 
 import androidx.test.espresso.web.assertion.WebViewAssertions.webMatches
+import androidx.test.espresso.web.model.Atom
+import androidx.test.espresso.web.model.Atoms.castOrDie
 import androidx.test.espresso.web.model.Atoms.getCurrentUrl
+import androidx.test.espresso.web.model.Atoms.script
 import androidx.test.espresso.web.sugar.Web.onWebView
-import androidx.test.espresso.web.webdriver.DriverAtoms.findElement
-import androidx.test.espresso.web.webdriver.DriverAtoms.getText
-import androidx.test.espresso.web.webdriver.DriverAtoms.webClick
-import androidx.test.espresso.web.webdriver.Locator
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.hamcrest.Matchers.containsString
@@ -36,13 +35,20 @@ class LaunchTest {
         }
     }
 
-    private fun byTestId(id: String) = findElement(Locator.CSS_SELECTOR, "[data-testid='$id']")
+    // The DOM is read and clicked directly: on a phone the status label is for screen readers only
+    // and the template button may be scrolled out of the toolbar, which WebDriver's visible-text
+    // and click atoms would treat as missing.
+    private fun textOf(testId: String): Atom<String> =
+        script("var e = document.querySelector(\"[data-testid='$testId']\"); return e ? e.textContent : '';", castOrDie(String::class.java))
+
+    private fun click(testId: String): Atom<Boolean> =
+        script("document.querySelector(\"[data-testid='$testId']\").click(); return true;", castOrDie(Boolean::class.javaObjectType))
 
     @Test
     fun engineStartsAndValidatesADrawing() {
         eventually { onWebView().check(webMatches(getCurrentUrl(), containsString(MainActivity.START_URL))) }
-        eventually { onWebView().withElement(byTestId("engine-status")).check(webMatches(getText(), containsString("runs on this device"))) }
-        onWebView().withElement(byTestId("template-benzene")).perform(webClick())
-        eventually(30_000) { onWebView().withElement(byTestId("phone-formula")).check(webMatches(getText(), containsString("C6H6"))) }
+        eventually { onWebView().check(webMatches(textOf("engine-status"), containsString("runs on this device"))) }
+        onWebView().perform(click("template-benzene"))
+        eventually(30_000) { onWebView().check(webMatches(textOf("phone-formula"), containsString("C6H6"))) }
     }
 }
